@@ -600,7 +600,7 @@ def main():
 					palette = comp_2leve_palette)
 	add_stat_annotation(ax, 
 						data = all_comp_2level,
-						x = 'compartment_pair_diff_same', y = "avg_oe",
+			    x = 'compartment_pair_diff_same', y = "avg_oe",
 						order = list(comp_2leve_palette.keys()),
 						box_pairs=[
 							("AA-BB", "AB")

@@ -18,10 +18,12 @@ logging.disable(logging.INFO)
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run LCS analysis')
-parser.add_argument("-a", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
+parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
 #parser.add_argument("-b",'--control', type=str, help='Path to the tsv file containing the control comparisons')
 parser.add_argument('-d','--data_dir', type=str, help='Path to the data directory')
 parser.add_argument('-o','--output', type=str, help='Path to the output directory')
+#parser.add_argument('-w','--INSULATION_WINDOW_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
+
 
 # %% Define variables
 CHROMSIZES = pd.read_csv("/home/karol/WGD_karol/resources/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
@@ -228,32 +230,36 @@ def get_interaction_type(x):
 		return "OTHER"
 
 
-def plot_inter_chromosomal_map_chrom_level_oe(sample_dump):
-
-	M = pd.pivot_table(sample_dump, 
-					   index='chr1', 
-					   columns='chr2', 
-					   values='balanced_rescaled', 
-					   observed=True)\
-			.sort_index(axis=0)\
-			.sort_index(axis=1)
-
-	n_chroms = M.shape[0] - 1
-	fig, ax = plt.subplots(1, 1, figsize=(7, 7))
-	sns.heatmap(M, cmap='bwr', square=True,
-				center = 1/n_chroms, vmin=0.9/n_chroms, vmax=1.1/n_chroms,
-				linewidth=0.1,
-				cbar_kws={'label': 'balanced counts', 'shrink': 0.5, 'aspect': 8},
-				xticklabels=False,
-				ax=ax)
-	patch = plt.Polygon([[0, 1.1], [0, 1.05], [1, 1.05]], transform=ax.transAxes, color='grey')
-	fig.add_artist(patch)
-	ax.text(0.5, 1.1, "Chromosome size", transform=ax.transAxes, ha='center')
-	ax.plot([0, M.shape[0]], [len(LONG_CHROMS), len(LONG_CHROMS)], color='black', linewidth=2)
-	ax.plot([len(LONG_CHROMS), len(LONG_CHROMS)], [0, M.shape[0]], color='black', linewidth=2)
-	ax.set_xlabel("Chromosome 2")
-	ax.set_ylabel("Chromosome 1")
-	return fig, ax
+def plot_inter_chromosomal_map_chrom_level_oe(sample_dump, sample_name):
+        '''
+        Plot the inter-chromosomal map of the Hi-C data
+        '''
+        # Compute scaling facotr for plot's legend
+        # Depending on the bin size used in DUMP
+        
+        sc_factor = (sample_dump.end1.iloc[1] - sample_dump.start1.iloc[1]) / 100000000
+        
+        M = pd.pivot_table(sample_dump, index='chr1', columns='chr2', values='balanced_rescaled',
+                           observed=True).sort_index(axis=0).sort_index(axis=1)
+        n_chroms = M.shape[0] - 1
+        fig, ax = plt.subplots(1, 1, figsize=(7, 7))
+        fig.suptitle(f"{sample_name}", fontsize=16)
+        sns.heatmap(M, cmap='bwr',
+                    square=True,
+                    center=((1*0.1)/n_chroms),
+                    vmin=((0.8*sc_factor)/n_chroms), vmax=((1.2*sc_factor)/n_chroms),
+                    linewidth=0.1,
+                    cbar_kws={'label': 'balanced counts', 'shrink': 0.5, 'aspect': 8},
+                    ax=ax)
+        patch = plt.Polygon([[0, 1.1], [0, 1.05], [1, 1.05]], transform=ax.transAxes, color='grey')
+        fig.add_artist(patch)
+        ax.text(0.5, 1.1, "Chromosome size", transform=ax.transAxes, ha='center')
+        ax.plot([0, M.shape[0]], [len(LONG_CHROMS), len(LONG_CHROMS)], color='black', linewidth=2)
+        ax.plot([len(LONG_CHROMS), len(LONG_CHROMS)], [0, M.shape[0]], color='black', linewidth=2)
+        ax.set_xlabel("Chromosome 2")
+        ax.set_ylabel("Chromosome 1")
+        
+        return fig, ax
 
 # Plot function from LCS pipeline; WGD paper
 #def plot_inter_chromosomal_map_chrom_level_oe(ax, sample_dump):
@@ -285,7 +291,7 @@ def plot_inter_chromosomal_map_chrom_level_foldchange(ratio):
 			.sort_index(axis=1)
 	fig, ax = plt.subplots(1, 1, figsize=(7, 7))
 	sns.heatmap(M.applymap(lambda x: np.log2(x)), 
-				vmin=-0.2, vmax=0.2, 
+				vmin=-0.4, vmax=0.4, 
 				cmap='RdBu_r',
 				linewidth=0.1,
 				cbar_kws={'label': '$log_2$(fold-change)\nof balanced counts', 'shrink': 0.5, 'aspect': 8}, 
@@ -471,44 +477,41 @@ def plot_percentage_trans_contacts(ax, all_phasing_stats_filter):
 
 
 # %% Load variables
-OUTPUT_PATH = parser.parse_args().output
-DATA_PATH = parser.parse_args().data_dir
-print(f"OUTPUT_PATH: {OUTPUT_PATH}")
-print(f"DATA_PATH: {DATA_PATH}")
 
-#INTER_CHROMOSOMAL_ANALYSIS_PATH = "/mnt/data2/karol/Projects/WGD_project/results_new/{hic_sample}_interchromosomal"
-HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
-INTER_CHROMOSOMAL_ANALYSIS_PATH = f"{OUTPUT_PATH}"+"/{hic_sample}_interchromosomal"
-# TSV files with the inter-chromosomal interactions
-
-# Output of 2.0_DUMP_COOL.py
-INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/2_dumps/binsize_10000000.tsv"
-
-# Compartment scores - output of 2.1_CALDER_SADDLE.py
-COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/3_CalderSaddleOutput_r1000000/compartment_scores.tsv"
-
-# Resoluts of the insulation analysis
-BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsualtionOutput/insulation_scores_r100000_KR_w1000000_boundaries.bed"
-INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsualtionOutput/insulation_scores_r100000_KR_w1000000.bigWig"
-
+# Constants
 TOP_K=300
 RESOLUTION = 1000000
 MAX_DISTANCE = 20000000
 
-LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep="\t")
-#LCS_CONTROL_COMPARISONS = pd.read_csv(args.control, h
-
-REPORT = {}
-OVERWRITE = False
-
+# OUTPUT
+OUTPUT_PATH = parser.parse_args().output
 print(f"OUTPUT_PATH: {OUTPUT_PATH}")
+
+INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"
+os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
+
+print(f"INTER_CHROMOSOMAL_OE_OUTPUT: {INTER_CHROMOSOMAL_OE_OUTPUT}")
+
+# INPUT
+LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep="\t")
+DATA_PATH = parser.parse_args().data_dir
 print(f"DATA_PATH: {DATA_PATH}")
-print(f"INTER_CHROMOSOMAL_ANALYSIS_PATH: {INTER_CHROMOSOMAL_ANALYSIS_PATH}")
-print(f"HIC_MAPS_PATH: {HIC_MAPS_PATH}")
-print(f"INTER_CHROMOSOMAL_DUMPS_PATH: {INTER_CHROMOSOMAL_DUMPS_PATH}")
-print(f"COMPARTMENT_SEGREGATION_PATH: {COMPARTMENT_SEGREGATION_PATH}")
-print(f"BOUNDARIES_PATH: {BOUNDARIES_PATH}")
-print(f"INSULATION_PATH: {INSULATION_PATH}")
+
+HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
+
+# Output of 2.0_DUMP_COOL.py - inter-chromosomal interactions
+INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/2_Dumps/binsize_10000000.tsv"
+
+# Compartment scores - output of 2.1_CALDER_SADDLE.py - compartment segregation
+COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/3_CalderSaddleOutput_r1000000/compartment_scores.tsv"
+
+# Resoluts of the insulation analysis - insulation scores and boundaries
+BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/insulation_scores_r50000_KR_w1000000_boundaries.bed"
+INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/insulation_scores_r50000_KR_w1000000.bigWig"
+
+#LCS_CONTROL_COMPARISONS = pd.read_csv(args.control, h
+REPORT = {}
+OVERWRITE = True
 
 # Print first row of LCS_COMPARISONS and LCS_CONTROL_COMPARISONS
                                       
@@ -521,22 +524,19 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 
 	print("- Inter-chromosomal LCS")
         
-	sample_dump1 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.full_name1)), 
-												  chrom_order=CHROMS_BY_SIZE)
-	name = os.path.join(INTER_CHROMOSOMAL_ANALYSIS_PATH.format(hic_sample=t.full_name1), f"{t.full_name1}_InterChromosomal_OE.pdf")
+	sample_dump1 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.full_name1)), chrom_order=CHROMS_BY_SIZE)
+	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.full_name1}_InterChromosomal_OE.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
-		os.makedirs(INTER_CHROMOSOMAL_ANALYSIS_PATH.format(hic_sample=t.full_name1), exist_ok=True)
-		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump1)
+		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump1, t.full_name1)
 		fig.savefig(name)
 		plt.close(fig)
 	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
 
 	sample_dump2 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.full_name2)), 
 												  chrom_order=CHROMS_BY_SIZE)
-	name = os.path.join(INTER_CHROMOSOMAL_ANALYSIS_PATH.format(hic_sample=t.full_name2), f"{t.full_name2}_InterChromosomal_OE.pdf")
+	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.full_name2}_InterChromosomal_OE.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
-		os.makedirs(INTER_CHROMOSOMAL_ANALYSIS_PATH.format(hic_sample=t.full_name2), exist_ok=True)
-		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump2)
+		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump2, t.full_name2)
 		fig.savefig(name)
 		plt.close(fig)
 	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
@@ -558,7 +558,6 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 		fig.savefig(name)
 		plt.close(fig)
 	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
 
 	print("- Compartment LCS")
 
@@ -649,8 +648,10 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 
 		fig, ax = plt.subplots(figsize=(5, 5))
 		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.full_name1, sample2 = t.full_name2)
+                
 		fig.savefig(name)
 		plt.close(fig)
+                
 	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
 
 

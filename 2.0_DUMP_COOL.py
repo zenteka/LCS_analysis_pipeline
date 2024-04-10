@@ -11,7 +11,6 @@
    - [OPTIONAL] resolution: at which resolution to dump (defaults to 10Mb)
 """
 
-
 import argparse
 import logging
 import os
@@ -25,7 +24,6 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 TMP_COARSENED_PATH = ".coarsened.cool"
-
 
 # HG19_CHROMS = ["chr" + str(x) for x in range(1, 23)] + ['chrX']
 # MM9_CHROMS = ["chr" + str(x) for x in range(1, 20)] + ['chrX']
@@ -68,7 +66,6 @@ def rescale_margins(m, n_rescaling_iterations=10):
 		cm = np.nansum(mb, axis=0)[np.newaxis, :]
 		mb = mb/cm
 	return mb
-
 
 def main():
 	logger = set_logger()
@@ -177,5 +174,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
-
