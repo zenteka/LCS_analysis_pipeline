@@ -1,11 +1,28 @@
 #+AUTHOR: Karol PIera
 #+TITLE: Loss of chromatin segregation
 
-* Install instructions
+* Pipeline for loss of chromatin segregation analyis (Beta version) 
+
+** About the pipeline
+
+The pipeline runs is currently comprised of 3 modules that are required for the complete LCS analysis plus the analysis itself. It is based on LCS pipeline used in the original [[https://github.com/CSOgroup/WGD][WGD paper.]]
 
 
-* Input
+#+begin_src bash
+ sudo apt
+
+
+  
+#+end_src
+
+
+** Installation instructions
+
+
+** Sample Input
 
 Table in tsv format with desired comparisons.
 
 | CPA_RB_AB_mega | CPA_RB_WGD_AB_mega |
+
+
