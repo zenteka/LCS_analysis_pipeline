@@ -1,28 +1,105 @@
 #+AUTHOR: Karol PIera
-#+TITLE: Loss of chromatin segregation
+#+TITLE: Pipeline for loss of chromatin segregation analysis (Beta version)
 
-* Pipeline for loss of chromatin segregation analyis (Beta version) 
 
-** About the pipeline
+* About the pipeline
 
-The pipeline runs is currently comprised of 3 modules that are required for the complete LCS analysis plus the analysis itself. It is based on LCS pipeline used in the original [[https://github.com/CSOgroup/WGD][WGD paper.]]
+The pipeline is currently comprised of 4 modules that are required for the complete LCS analysis plus the 5 module that is analysis itself. It is based on LCS pipeline used in the original [[https://github.com/CSOgroup/WGD][WGD paper.]]  See below for details. 
 
+This pipeline is an extension of hic_pipeline, therefore it follows an input directory structure of the hic_pipeline. For more details please refer
+to the CSO [[https://github.com/CSOgroup/hic_pipeline][hic_pipeline here]].
 
 #+begin_src bash
- sudo apt
+usage () {
+    	  echo "|---------------------------------------------------------------------------------------------------|"  
+	  echo "| Run LCS PIPELINE.                                                                                 |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| Usage: ./cmd -i DATA -c COMPARISONS -o PLOTS_PATH -b BIN_SIZE -p THREADS -n NORM -w WINDOW_SIZE   |"
+	  echo "| See verbose descritpion below:                                                                    |"
+	  echo "| -i Path to the directory with hic pipeline results.                                               |"
+	  echo "|    IMPORTANT: this path serves as output path for Calder, Dump, Saddle and Insulation scores.     |"
+	  echo "| -c TSV table with desired comparison. Sample names HAVE TO match hic pipeline output results!!!!  |"
+          echo "|---------------------------------------------------------------------------------------------------|"
+          echo "| 1) Run Calder: -b BIN SIZE (also used to compute insulation scores)                               |"
+	  echo "|                -p No. of threads to use. Genome is set to hg19 (modify in the script).            |"
+          echo "|                -Adaptive is set to true.                                                          |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 2) Dump interchromosomal contacts: Check DUMP_RES varaible to modify.                             |"
+	  echo "|    Default value: 100000 1000000 10000000                                                         |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 3) Run Saddle:                                                                                    |"
+	  echo "|    Run Saddle script for each resolution that we was used to dump matrices.                       |"
+	  echo "|    N. Tiles is set to 16. Modify in the script.                                                   |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 4) Run Insulation scores: -w Insulation window size.                                              |"
+	  echo "|                           -n Normalisation for insulation scores. [KR or VC_SQRT]                 |"
+	  echo "|                           -b resolution (reused BIN SIZE for Calder)                              |"
+	  echo "|    Fixed params for insulation analysis (Modify in the script):                                   |"
+	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| One can skip above steps if needed (comment out core functions) and run LCS analysis directly.    |"
+	  echo "| Sample dir structure required for LCS analysis:                                                   |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "|            ./{hic_sample}/1_CalderOutput_50000 						    |"
+	  echo "|                           2_Dumps                                                                 |"
+	  echo "|                           3_CalderSaddleOutput_r100000 					    |"
+	  echo "|                           3_CalderSaddleOutput_r1000000 				     	    |"
+	  echo "|                           3_CalderSaddleOutput_r10000000 				   	    |"
+	  echo "|                           4_InsulationOutput 						    	    |"	
+	  echo "|                           aligned 						             	    |"
+	  echo "|                                        						            |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 5) Run LCS analysis: -c Comparisons                                                               |"
+	  echo "|                      -o PLOTS PATH                                                                |"
+	  echo "|                      -i Input data as above                                                       |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+}
 
-
-  
 #+end_src
 
-
-** Installation instructions
 
 
 ** Sample Input
 
-Table in tsv format with desired comparisons.
+Table in tsv format with desired comparisons. Please MAKE SURE that selected comparison correspond to directory names in the hic_pipeline output.
 
-| CPA_RB_AB_mega | CPA_RB_WGD_AB_mega |
+| SAMPLE_1            | SAMPLE 2               |
+| e.g. CPA_RB_AB_mega | e.g.CPA_RB_WGD_AB_mega |
+
+
+
+* Installation instructions
+
+Clone repository and install dependencies.
+
+#+begin_src
+  git clone https://github.com/zenteka/LCS_analysis_pipeline.git
+  ./install_lcs_pipeline.sh
+#+end_src
+
+
+
+* Output
+
+** Data
+
+Sample output after running the pipeline with the following flags:
+-c 50000
+-w 100000
+-n KR
+
+#+begin_src bash
+ ./{hic_sample}/1_CalderOutput_50000                        
+                2_Dumps                                     
+                3_CalderSaddleOutput_r100000                
+                3_CalderSaddleOutput_r1000000               
+                3_CalderSaddleOutput_r10000000              
+                4_InsulationOutput                          
+                aligned                                                                                                  
+#+end_src
+
+** Plots
+
+All the plots will be saved to the directory provided by the user. Number of directories will correspond to the number of comparisons specifed.
 
 

@@ -139,7 +139,7 @@ source ~/mambaforge/etc/profile.d/mamba.sh
 mamba activate lcs_pipeline
 
 # Define functions
-run_calder() {
+run_module_calder() {
     calder --input $1 \
 	   --bin_size $2 \
 	   --nproc $3 \
@@ -148,7 +148,7 @@ run_calder() {
 	   --adaptive
 }
 
-run_dump() {
+run_module_dump() {
 	python 2.0_DUMP_COOL.py --resolution ${1} \
 	   --excludeChroms ${EXCLUDED_CHROMOSOMES} \
 	   "${2}::/resolutions/${DUMP_RES[0]}" \
@@ -220,7 +220,7 @@ do
 	    mkdir -p $CALDER_OUT
 	fi
         
-	#run_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
+	#run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
 	
 	# Dump interchromosomal contacts for given resolutions
 	for res in ${DUMP_RES[@]};
@@ -234,7 +234,7 @@ do
 		mkdir -p $DUMP_OUT
 	    fi
 	    
-            #run_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
+            #run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
             
 	    # Run CALDER saddle for each his resolution
 	    echo "---------------------------------------------"

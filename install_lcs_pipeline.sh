@@ -24,7 +24,7 @@ fi
 if conda info --envs | grep -q ${ENVIRONMENT_NAME}; then 
 	echo "Environment ${ENVIRONMENT_NAME} already exists"
 else 
-	conda env create -f ${ENVIRONMENT_PATH}
+    conda env create -f ${ENVIRONMENT_PATH}
 fi
 
 eval "$(conda shell.bash hook)"
