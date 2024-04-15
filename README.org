@@ -1,0 +1,11 @@
+#+AUTHOR: Karol PIera
+#+TITLE: Loss of chromatin segregation
+
+* Install instructions
+
+
+* Input
+
+Table in tsv format with desired comparisons.
+
+| CPA_RB_AB_mega | CPA_RB_WGD_AB_mega |
