@@ -19,26 +19,34 @@ logging.disable(logging.INFO)
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run LCS analysis')
 parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
-#parser.add_argument("-b",'--control', type=str, help='Path to the tsv file containing the control comparisons')
 parser.add_argument('-d','--data_dir', type=str, help='Path to the data directory')
+parser.add_argument('-g','--genome', type=str, help='Genome assembly')
 parser.add_argument('-o','--output', type=str, help='Path to the output directory')
 #parser.add_argument('-w','--INSULATION_WINDOW_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
 
-
 # %% Define variables
-CHROMSIZES = pd.read_csv("/home/karol/WGD_karol/resources/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
+if args.genome == "hg38":
+        CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/WGD_I_analysis/ref/hg38.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
+        print("Genome assembly: hg38")
+elif args.genome == "hg19":
+        CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/WGD_I_analysis/ref/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
+        print("Genome assembly: hg19")
+else:
+        print("Genome assembly not recognized. Please provide a valid genome assembly (hg19 or hg38)")
+        sys.exit(1)
+        
 CHROMS_BY_SIZE = CHROMSIZES.sort_values('length', ascending=False).chr.tolist()
 LONG_CHROMS = CHROMS_BY_SIZE[:15]
 SHORT_CHROMS = CHROMS_BY_SIZE[15:]
 
 COMPARTMENTS_8_LABELS = ["{}.{}.{}".format(l1, l2, l3) for l1 in ['A', 'B'] for l2 in [1, 2] for l3 in [1, 2]]
 
-
 INSULATION_CHANGE_TO_COLOR = {
 		'gain': 'red',
 		'loss': 'blue'
 	}
 
+# %% Define functions
 def load_hic_interchromosomal_dump(spath, chrom_order = CHROMS_BY_SIZE):
 	s_ints = pd.read_csv(spath, sep="\t")
 	s_ints['bin_id1'] = s_ints.chr1 + ":" + s_ints.start1.astype(str) + "-" + s_ints.end1.astype(str)
@@ -334,7 +342,7 @@ def plot_compartment_scores(ax, comp_stats):
 
 
 def plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes):
-
+        
 	ab_aabb_values = pairwise_compartment_segregation_changes.assign(
 												h1 = lambda x: x.compartment1.map(lambda y: y.split(".")[0]),
 												h2 = lambda x: x.compartment2.map(lambda y: y.split(".")[0]),
@@ -408,8 +416,6 @@ def plot_shared_boundaries_insulation(ax,
 	ax.set_ylabel(yname)
 	sns.despine(ax=ax)
 
-
-
 def plot_shared_TOPK_boundaries_insulation(ax,
 										   shared_boundaries, 
 										   topk_thresh,
@@ -475,27 +481,20 @@ def plot_percentage_trans_contacts(ax, all_phasing_stats_filter):
 	ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', va='top', rotation_mode = 'anchor')
 	sns.despine(ax=ax)
 
+# %% Run main analysis
 
-# %% Load variables
-
-# Constants
+# Constans
 TOP_K=300
 RESOLUTION = 1000000
 MAX_DISTANCE = 20000000
 
 # OUTPUT
-OUTPUT_PATH = parser.parse_args().output
-print(f"OUTPUT_PATH: {OUTPUT_PATH}")
-
-INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"
-os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
-
-print(f"INTER_CHROMOSOMAL_OE_OUTPUT: {INTER_CHROMOSOMAL_OE_OUTPUT}")
+OUTPUT_PATH = parser.parse_args().output                             # Save allthe main plots
+INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"# Save the inter-chromosomal Observed/Expected plots for each sample
 
 # INPUT
 LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep="\t")
 DATA_PATH = parser.parse_args().data_dir
-print(f"DATA_PATH: {DATA_PATH}")
 
 HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
 
@@ -513,8 +512,7 @@ INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/insulation_sc
 REPORT = {}
 OVERWRITE = True
 
-# Print first row of LCS_COMPARISONS and LCS_CONTROL_COMPARISONS
-                                      
+# Print first row of LCS_COMPARISONS and LCS_CONTROL_COMPARISONS                                      
 for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuples()):
 	print("---------------------------------")
 	print(f"{t.full_name1} VS {t.full_name2}")

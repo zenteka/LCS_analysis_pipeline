@@ -5,12 +5,15 @@
 # Work inprogress
 # Email: karol.piera@unil.ch
 
-set -e
+#set -e
+SCRIPT_DIR=$(dirname $0)
 
 # Parse arguments to variables
 # Add most important parameters to getopts.
 # Optionally one can trun fixed params such as genome into OPTARG as well.
-# TODO: add genome flag
+# TODO:
+## 1) Add more fixed parameters to getopts -d to control dump resolution, -g to control genome
+
 
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
@@ -27,7 +30,7 @@ usage () {
           echo "|                -Adaptive is set to true.                                                          |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 2) Dump interchromosomal contacts: Check DUMP_RES varaible to modify.                             |"
-	  echo "|    Default value: 100000 1000000 10000000                                                         |"
+	  echo "|    -d Dump resolution (minimal resolution). Default 10000                                         |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 3) Run Saddle:                                                                                    |"
 	  echo "|    Run Saddle script for each resolution that we was used to dump matrices.                       |"
@@ -71,6 +74,19 @@ while getopts ":b:i:c:p:w:n:o:h" opt; do
 		exit 1
 	    fi
 	    ;;
+	g)
+	    # Genome
+	    if [ $OPTARG == "hg19" ]; then
+		GEN_PATH=$SCRIPT_DIR/ref/hg19.main.chrom.sizes
+		GENOME="hg19"
+	    elif [ $OPTARG == "hg38" ]; then
+		GEN_PATH=$SCRIPT_DIR/ref/hg38.main.chrom.sizes
+		GENOME="hg38"
+	    else
+		echo "Invalid genome. Provide either hg19 or hg38"
+		exit 1
+	    fi
+	    ;;
 	i )
 	    # Results directory
 	    INPUT_DIR=$OPTARG
@@ -78,8 +94,7 @@ while getopts ":b:i:c:p:w:n:o:h" opt; do
    
 	p)
 	  # Thread control
-	    NPROC=$OPTARG
-	  
+	    NPROC=$OPTARG	  
 	    ;;
 	w)
 	    # Insulation window size
@@ -115,7 +130,7 @@ done
 # If neeeded, they can be added to getpos as well to customize the input better
 
 # Fixed parameters CALDER
-GENOME="hg19"
+GENOME="hg38"
 
 # Fixexd parameters - DUMP
 DUMP_RES=("100000" "1000000" "10000000" ) # Dump resolutions
@@ -129,16 +144,25 @@ INS_OUTPUT_FORMAT="bigwig"
 INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
 
-# Initalize arrays 
-# SAM_ARRAY=()
-# HIC_ARRAY=()
-# COOL_ARRAY=()
-
+# Env
 source ~/mambaforge/etc/profile.d/conda.sh
 source ~/mambaforge/etc/profile.d/mamba.sh
 mamba activate lcs_pipeline
 
 # Define functions
+# Ask user if they want to proceed
+ask_user () {
+        echo "$1 output found."
+	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
+	read in_p
+	echo $in_p
+	if [ $in_p == 'yes' ] || [ $in_p == 'y' ]; then
+	    return 0
+	else
+	    return 1
+	fi
+}
+
 run_module_calder() {
     calder --input $1 \
 	   --bin_size $2 \
@@ -191,6 +215,43 @@ run_insulation() {
 	 --delta ${BOUNDARY_DELTA_WINDOW}
 }
 
+# Make some check before running modules
+# Since Calder, Dump, Saddle and Insulation are essential for the LCS analysis but costly on time,
+# we let user to decide if they want to re-run them or skip if the output is already present.
+
+if [ $(find $INPUT_DIR -name *sub*.bed | wc -l) -gt 0 ]; then
+    ask_user "Calder"
+    if [ $? -eq 0 ]; then
+	Calder="Calder"
+    else
+	Calder=""
+    fi
+else
+    Calder="Calder"
+fi
+
+if [ $(find $INPUT_DIR -type d -name 2_Dumps | wc -l) -gt 0 ]; then
+    ask_user "Dump"
+    if [ $? -eq 0 ]; then
+	Dump="Dump"
+    else
+	Dump=""
+    fi
+else
+    Dump="Dump"
+fi
+
+if [ $(find $INPUT_DIR -type d -name 3_CalderSaddleOutput* | wc -l) -gt 0 ]; then
+    ask_user "Saddle and Insulation"
+    if [ $? -eq 0 ]; then
+	Saddle="Saddle"
+    else
+	Saddle=""
+    fi
+else
+    Saddle="Saddle"
+fi
+
 # Loop over hic pipeline results:
 for dir in $INPUT_DIR/*; 
 do
@@ -219,8 +280,12 @@ do
 	if [ ! -d $CALDER_OUT ]; then
 	    mkdir -p $CALDER_OUT
 	fi
-        
-	#run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
+
+	if [ $Calder == "Calder" ]; then
+	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
+	else
+	    echo "Skipping Calder for $sample"
+	fi
 	
 	# Dump interchromosomal contacts for given resolutions
 	for res in ${DUMP_RES[@]};
@@ -233,8 +298,11 @@ do
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
-	    
-            #run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
+	    if [ $Dump == "Dump" ]; then
+		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
+	    else
+		echo "Skipping Dump for $sample"
+	    fi
             
 	    # Run CALDER saddle for each his resolution
 	    echo "---------------------------------------------"
@@ -251,8 +319,13 @@ do
 		
 		if [ ! -d $SADDLE_OUT ]; then
 		    mkdir -p $SADDLE_OUT
-		fi	
- 		#run_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} ${res} ${CALDER_RES} ${N_TILES} 
+		fi
+		if [ $Saddle == "Saddle" ]; then
+ 		    run_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} ${res} ${CALDER_RES} ${N_TILES}
+		else
+		    echo "Skipping Saddle for $sample"
+		fi
+		
 	    fi
 	done
 	
@@ -268,8 +341,11 @@ do
 	fi
 	
 	OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INSULATION_WINDOW_SIZE}
-    
-	#run_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F} 
+	if [ $Saddle == "Saddle" ]; then
+	    run_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
+	else
+	    echo "Skipping Insulation for $sample"
+	fi
     fi    
 done
 
@@ -285,6 +361,7 @@ fi
 
 # Run main LCS analysis
 python 3.0_RUN_LCS.py -c $LCS_COMPARISON \
+        -g $GENOME \
         -d $INPUT_DIR \
         -o $OUT_PATH
 
