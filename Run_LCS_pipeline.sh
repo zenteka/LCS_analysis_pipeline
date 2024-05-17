@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Wrapper around Luca's LCS pipeline.
-# Compute calder compartments, dump interchromosomal contacts, compute cscores and insulation boundaries/scroes.
+# Compute calder compartments, dump interchromosomal contacts, compute cscores and insulation boundaries/scores.
 # AUTHOR: Karol Piera and Luca Nanni
 # Email: karol.piera@unil.ch
 
@@ -21,8 +21,8 @@ usage () {
 	  echo "| It requires output of 4 prior modules: Calder compartment calls, DUMP interchromosomal contacts,  |"
 	  echo "| compartment segregation scores from Calder Saddle and insulation (scores and boundires), 	    |"
 	  echo "| from insulation module.                                                                           |"
-	  echo "| Module 1 and module 4 is implented in this script, modules 2 and 3 are implemented as separate    |"
-	  echo "| scripts found in src directory.                                                                   |"
+	  echo "| Module 1 and module 4 are  implemented in fanc. Other modules are implemented in python.          |"
+	  echo "| Scripts can be found in src/ directory.                                                           |"
 	  echo "| IMPORTANT: To save time, if output exists, user is asked if they want to re-run modules 1-4!      |"
 	  echo "|---------------------------------------------------------------------------------------------------|"    
 	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA -o PLOTS_PATH -c COMPARISON_TABLE       # In/Out, Comparison |" 
@@ -56,7 +56,7 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 4) Run Insulation Module:                                                                         |"
 	  echo "|    -w Window size for insulation scores. Default 1000000.                                         |"
-	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR]. Default KR.                            |"
+	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR].                                        |"
 	  echo "|    -b BIN_SIZE - Resolution of Calder. Default 50000. Minimum is 10000. 			    |"
 	  echo "|    Fixed params for insulation analysis (Modify in the script):                                   |"
 	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
@@ -104,11 +104,7 @@ while getopts ":b:c:D:g:i:o:p:r:w:n:h" opt; do
 	    ;;
 	D )
 	    # Dump resolution
-	    if [ $OPTARG == "all" ]; then
-		DUMP_RES=("1000000" "10000000" "100000000")
-	    else
-		DUMP_RES=( $OPTARG )
-	    fi
+	    DUMP_RES=( $OPTARG )
 	    ;;
 	g )
 	    # Genome
@@ -184,7 +180,6 @@ done
 # Fixed parameters are those that do not change across analysis very often
 # If neeeded, they can be added to getpos as well to customize the input better
 # Fixexd parameters - DUMP
-
 CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include 
 EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
 
@@ -214,7 +209,6 @@ ask_user () {
 	fi
 }
 
-# Make some check before running modules
 # Since Calder, Dump, Saddle and Insulation are essential for the LCS analysis but costly on time,
 # we let user to decide if they want to re-run them or skip if the output is already present.
 if [ $(find $INPUT_DIR -name *30.hic | wc -l) -eq 0 ]; then
