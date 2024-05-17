@@ -22,13 +22,14 @@ parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file c
 parser.add_argument('-d','--data_dir', type=str, help='Path to the data directory')
 parser.add_argument('-g','--genome', type=str, help='Genome assembly')
 parser.add_argument('-o','--output', type=str, help='Path to the output directory')
-#parser.add_argument('-w','--INSULATION_WINDOW_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
+parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of cscores', default=10000000)
+parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
 
 # %% Define variables
-if args.genome == "hg38":
+if parser.parse_args().genome == "hg38":
         CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/WGD_I_analysis/ref/hg38.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
         print("Genome assembly: hg38")
-elif args.genome == "hg19":
+elif parser.parse_args().genome == "hg19":
         CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/WGD_I_analysis/ref/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
         print("Genome assembly: hg19")
 else:
@@ -491,7 +492,7 @@ MAX_DISTANCE = 20000000
 # OUTPUT
 OUTPUT_PATH = parser.parse_args().output                             # Save allthe main plots
 INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"# Save the inter-chromosomal Observed/Expected plots for each sample
-
+os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
 # INPUT
 LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep="\t")
 DATA_PATH = parser.parse_args().data_dir
@@ -502,17 +503,16 @@ HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
 INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/2_Dumps/binsize_10000000.tsv"
 
 # Compartment scores - output of 2.1_CALDER_SADDLE.py - compartment segregation
-COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/3_CalderSaddleOutput_r1000000/compartment_scores.tsv"
+COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"3_CalderSaddleOutput_r{parser.parse_args().HicResolution}/compartment_scores.tsv"
 
-# Resoluts of the insulation analysis - insulation scores and boundaries
-BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/insulation_scores_r50000_KR_w1000000_boundaries.bed"
-INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/insulation_scores_r50000_KR_w1000000.bigWig"
+# Boundaries and insulation scores - output of 4.0_Insulation.py - insulation scores
+BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}_boundaries.bed"
+INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}.bigWig"
 
-#LCS_CONTROL_COMPARISONS = pd.read_csv(args.control, h
 REPORT = {}
 OVERWRITE = True
 
-# Print first row of LCS_COMPARISONS and LCS_CONTROL_COMPARISONS                                      
+# %% Run the analysis
 for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuples()):
 	print("---------------------------------")
 	print(f"{t.full_name1} VS {t.full_name2}")
