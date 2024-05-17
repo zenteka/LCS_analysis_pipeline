@@ -100,6 +100,6 @@ Sample output after running the pipeline with the following flags:
 
 ** Plots
 
-All the plots will be saved to the directory provided by the user. Number of directories will correspond to the number of comparisons specifed.
-
+All the plots will be saved to the directory provided by the user. Number of directories will correspond to the number of comparisons specified,
+plus one extra direcotry for sample-level OE-interchromosomal comparisons.
 

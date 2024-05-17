@@ -12,33 +12,45 @@ SCRIPT_DIR=$(dirname $0)
 # Add most important parameters to getopts.
 # Optionally one can trun fixed params such as genome into OPTARG as well.
 # TODO:
-## 1) Add more fixed parameters to getopts -d to control dump resolution, -g to control genome
-
+## 1) Add more fixed parameters to getopts -d to control dump resolution, DONE: -g to control genome
 
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
 	  echo "| Run LCS PIPELINE.                                                                                 |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| Usage: ./cmd -i DATA -c COMPARISONS -o PLOTS_PATH -b BIN_SIZE -p THREADS -n NORM -w WINDOW_SIZE   |"
+	  echo "| USAGE: ./1.0_LCS.sh  -i DATA -o PLOTS_PATH -c COMPARISON_TABLE               # Analysis I/O       |"
+	  echo "|                      -g GENOME -b BIN_SIZE -p THREADS                        # CALDER flags       |"
+	  echo "|                      -D DUMP_RES                                             # Dump flag          |"
+	  echo "|                      -r HIC_RES -b BIN_SIZE                                  # Calder Saddle flag |"
+	  echo "|                      -w INS_W_SIZE -n INS_NORMALISATION                      # Insulation flag    |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| See verbose descritpion below:                                                                    |"
 	  echo "| -i Path to the directory with hic pipeline results.                                               |"
 	  echo "|    IMPORTANT: this path serves as output path for Calder, Dump, Saddle and Insulation scores.     |"
 	  echo "| -c TSV table with desired comparison. Sample names HAVE TO match hic pipeline output results!!!!  |"
           echo "|---------------------------------------------------------------------------------------------------|"
-          echo "| 1) Run Calder: -b BIN SIZE (also used to compute insulation scores)                               |"
-	  echo "|                -p No. of threads to use. Genome is set to hg19 (modify in the script).            |"
-          echo "|                -Adaptive is set to true.                                                          |"
+          echo "| 1) Run Calder Module:                                                                             |"
+	  echo "|    -b BIN_SIZE - Resolution for Calder. Default 50000. Minimum is 10000.  			    |"
+	  echo "|    (Used also for insulation analysis and calder saddle script.)                                  |"
+	  echo "|    -g Genome [hg19 or hg38]. Default hg19. See ./ref for files.                                   |"
+	  echo "|    -p Thread control. Default 1.								    |"
+          echo "|    - Adaptive is set to true.                                                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| 2) Dump interchromosomal contacts: Check DUMP_RES varaible to modify.                             |"
-	  echo "|    -d Dump resolution (minimal resolution). Default 10000                                         |"
+	  echo "| 2) Run Dump Module: 	                                                    			    |"
+	  echo "|   -d Resolution at which to dump interchromosomal contacts. Defualt is 1000000000.                |"
+	  echo "|   If -D all - dump 1000000 100000000 1000000000.                                                  |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| 3) Run Saddle:                                                                                    |"
-	  echo "|    Run Saddle script for each resolution that we was used to dump matrices.                       |"
-	  echo "|    N. Tiles is set to 16. Modify in the script.                                                   |"
+	  echo "| 3) Run Calder_Saddle. This module requires output from Calder.				    |"
+	  echo "|    Compute compartment segregation scores. Outut cscores tsv file used by LCS script.		    |"
+	  echo "|    -b BIN_SIZE - Calder resoultion                                                                |"
+	  echo "|    -r Hic resoultion to use. Default 1000 000.                                                    |" 
+	  echo "|    - Number of tiles for compartment segregation is set to 16.                                    |"
+	  echo "|      Modify N_TILE parameter to change.                                                           |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| 4) Run Insulation scores: -w Insulation window size.                                              |"
-	  echo "|                           -n Normalisation for insulation scores. [KR or VC_SQRT]                 |"
-	  echo "|                           -b resolution (reused BIN SIZE for Calder)                              |"
+	  echo "| 4) Run Insulation Module:                                                                         |"
+	  echo "|    -w Window size for insulation scores. Default 1000000.                                         |"
+	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR]. Default KR.                            |"
+	  echo "|    -b BIN_SIZE - Resolution of Calder. Default 50000. Minimum is 10000. (Re-used for insualtion)  |"
 	  echo "|    Fixed params for insulation analysis (Modify in the script):                                   |"
 	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
@@ -47,9 +59,7 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "|            ./{hic_sample}/1_CalderOutput_50000 						    |"
 	  echo "|                           2_Dumps                                                                 |"
-	  echo "|                           3_CalderSaddleOutput_r100000 					    |"
 	  echo "|                           3_CalderSaddleOutput_r1000000 				     	    |"
-	  echo "|                           3_CalderSaddleOutput_r10000000 				   	    |"
 	  echo "|                           4_InsulationOutput 						    	    |"	
 	  echo "|                           aligned 						             	    |"
 	  echo "|                                        						            |"
@@ -60,12 +70,8 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 }
 
-while getopts ":b:i:c:p:w:n:o:h" opt; do
+while getopts ":b:c:D:g:i:o:p:r:w:n:h" opt; do
     case ${opt} in
-	c )
-	    # LCS comparisons
-	    LCS_COMPARISON=$OPTARG
-	    ;;
 	b )
 	    # Calder resolution 
 	    CALDER_RES=$OPTARG
@@ -74,7 +80,30 @@ while getopts ":b:i:c:p:w:n:o:h" opt; do
 		exit 1
 	    fi
 	    ;;
-	g)
+	c )
+	    # LCS comparisons to perform
+	    COMPARISON_TABLE=$OPTARG
+	    # check file passed and is a tsv
+	    if [ $(echo $COMPARISON_TABLE | awk -F. '{print $NF}') == "tsv" ]; then
+		if [ ! -f $COMPARISON_TABLE ]; then
+		    echo "Comparison table does not exist"
+		    exit 1
+		fi
+	    else
+		echo "Invalid file format. Please provide a tsv file"
+		exit 1
+	    fi
+		    
+	    ;;
+	D )
+	    # Dump resolution
+	    if [ $OPTARG == "all" ]; then
+		DUMP_RES=("1000000" "10000000" "100000000")
+	    else
+		DUMP_RES=( $OPTARG )
+	    fi
+	    ;;
+	g )
 	    # Genome
 	    if [ $OPTARG == "hg19" ]; then
 		GEN_PATH=$SCRIPT_DIR/ref/hg19.main.chrom.sizes
@@ -83,62 +112,76 @@ while getopts ":b:i:c:p:w:n:o:h" opt; do
 		GEN_PATH=$SCRIPT_DIR/ref/hg38.main.chrom.sizes
 		GENOME="hg38"
 	    else
-		echo "Invalid genome. Provide either hg19 or hg38"
+		echo "Invalid genome. Supported genomes are hg19 and hg38"
 		exit 1
 	    fi
 	    ;;
 	i )
-	    # Results directory
+	    # INPUT. Results directory
 	    INPUT_DIR=$OPTARG
+	    if [ ! -d $INPUT_DIR ]; then
+		echo "Input directory does not exist"
+		exit 1
+	    fi
 	    ;;
    
-	p)
+	p )
 	  # Thread control
-	    NPROC=$OPTARG	  
+	    NPROC=$OPTARG
 	    ;;
-	w)
+	r )
+	    # Hic resolution
+	    HIC_RES=$OPTARG
+	    ;;
+	w )
 	    # Insulation window size
-	    INSULATION_WINDOW_SIZE=$OPTARG
+	    INS_W_SIZE=$OPTARG
 	    ;;
 	n)
 	    # Normalisation for insulation scores
 	    INS_NORMALISATION=$OPTARG
-            
 	    # check if normalisation is valid
 	    if [ $INS_NORMALISATION != "KR" ] && [ $INS_NORMALISATION != "VC_SQRT" ]; then
 		echo "Invalid normalisation. Choose either KR or VC_SQRT"
 		exit 1
 	    fi  
 	    ;;
-	o)
+	o )
 	    # Output directory
 	    OUT_PATH=$OPTARG
+	    if [ ! -d $OUT_PATH ]; then
+		mkdir -p $OUT_PATH
+	    fi
 	    ;;
-       * | h )
-	   usage
+	: )
+	   echo "Option -$OPTARG requires an argument." >&2
+	   exit 1
+	   ;;
+	h )
+	    usage
 	    exit 1
 	    ;;
-       \? )
- 	    echo "Invalid option: $OPTARG" 1>&2
-	    exit 1
-	    ;;
-  esac
+	? )
+ 	   echo "Invalid option passed: $OPTARG" 1>&2
+	   exit 1
+	   ;;
+    esac
 done
+
+#if [ "$INPUT_DIR == "" " ] || [ "$OUT_PATH" == "" ] || [ "$COMPARISON_TABLE" == "" ]; then
+#    echo "Missing required arguments"
+#    usage
+#-   exit 1
+#fi
+
 
 
 # Fixed parameters are those that do not change across analysis very often
 # If neeeded, they can be added to getpos as well to customize the input better
-
-# Fixed parameters CALDER
-GENOME="hg38"
-
 # Fixexd parameters - DUMP
-DUMP_RES=("100000" "1000000" "10000000" ) # Dump resolutions
 EXCLUDED_CHROMOSOMES="chrM,chrY" # Chromosomes to exclude
-
 # Fixed parameters - SADDLE
 N_TILES=16
-
 # Fixed parameters - INSUALTION
 INS_OUTPUT_FORMAT="bigwig"
 INS_TRIM_MEAN=0
@@ -150,19 +193,63 @@ source ~/mambaforge/etc/profile.d/mamba.sh
 mamba activate lcs_pipeline
 
 # Define functions
-# Ask user if they want to proceed
+# Ask user if they want to proceed - helper function
 ask_user () {
         echo "$1 output found."
 	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
 	read in_p
 	echo $in_p
-	if [ $in_p == 'yes' ] || [ $in_p == 'y' ]; then
+	if [ $in_p == 'yes' ] || [ $in_p == 'y' ] ; then
 	    return 0
 	else
 	    return 1
 	fi
 }
 
+# Make some check before running modules
+# Since Calder, Dump, Saddle and Insulation are essential for the LCS analysis but costly on time,
+# we let user to decide if they want to re-run them or skip if the output is already present.
+if [ $(find $INPUT_DIR -name *30.hic | wc -l) -eq 0 ]; then
+	echo "No hic files found in $INPUT_DIR"
+	exit 1
+fi
+
+
+if [ $(find $INPUT_DIR -name *sub*.bed | wc -l) -gt 0 ]; then
+    ask_user "Calder"
+    if [ $? -eq 0 ]; then
+	Calder="Calder"
+    else
+	Calder=""
+    fi
+else
+    Calder="Calder"
+fi
+
+if [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[0]}.tsv | wc -l) -gt 0 ]; then
+    ask_user "Dump"
+    if [ $? -eq 0 ]; then
+	Dump="Dump"
+    else
+	Dump=""
+    fi
+else
+    Dump="Dump"
+fi
+
+if [ $(find $INPUT_DIR -type d -name 3_CalderSaddleOutput* | wc -l) -gt 0 ]; then
+    ask_user "Saddle and Insulation"
+    if [ $? -eq 0 ]; then
+	Saddle="Saddle"
+    else
+	Saddle=""
+    fi
+else
+    Saddle="Saddle"
+fi
+
+
+# Define each module. LCS scritpt is executed only if all the modules were run or data strcutre with corresponding output is present.
 run_module_calder() {
     calder --input $1 \
 	   --bin_size $2 \
@@ -192,7 +279,7 @@ run_insulation() {
     fanc insulation $1@${CALDER_RES}@${INS_NORMALISATION} \
 	 $3 \
 	 -o "bigwig" \
-	 --window-sizes ${INSULATION_WINDOW_SIZE} \
+	 --window-sizes ${INS_W_SIZE} \
 	 --offset 0 \
 	 --geom-mean \
 	 --trim-mean ${INS_TRIM_MEAN}
@@ -211,48 +298,12 @@ run_insulation() {
     # Compute insualtion boundaries
     fanc boundaries ${3}.bigWig \
 	 ${3}_boundaries.bed \
-	 --window-sizes ${INSULATION_WINDOW_SIZE} \
+	 --window-sizes ${INS_W_SIZE} \
 	 --delta ${BOUNDARY_DELTA_WINDOW}
 }
 
-# Make some check before running modules
-# Since Calder, Dump, Saddle and Insulation are essential for the LCS analysis but costly on time,
-# we let user to decide if they want to re-run them or skip if the output is already present.
 
-if [ $(find $INPUT_DIR -name *sub*.bed | wc -l) -gt 0 ]; then
-    ask_user "Calder"
-    if [ $? -eq 0 ]; then
-	Calder="Calder"
-    else
-	Calder=""
-    fi
-else
-    Calder="Calder"
-fi
-
-if [ $(find $INPUT_DIR -type d -name 2_Dumps | wc -l) -gt 0 ]; then
-    ask_user "Dump"
-    if [ $? -eq 0 ]; then
-	Dump="Dump"
-    else
-	Dump=""
-    fi
-else
-    Dump="Dump"
-fi
-
-if [ $(find $INPUT_DIR -type d -name 3_CalderSaddleOutput* | wc -l) -gt 0 ]; then
-    ask_user "Saddle and Insulation"
-    if [ $? -eq 0 ]; then
-	Saddle="Saddle"
-    else
-	Saddle=""
-    fi
-else
-    Saddle="Saddle"
-fi
-
-# Loop over hic pipeline results:
+# Loop over hic pipeline results (input directory)
 for dir in $INPUT_DIR/*; 
 do
     if [ ! -d $dir ]; then
@@ -262,15 +313,7 @@ do
 	sample=$(basename $dir)
 	HIC_PATH=$( realpath $(find $dir -name "*30.hic") ) # Get hic file
 	COOL_PATH=$( realpath $(find $dir -name "*30.mcool") ) # Get cool file
-
-	# Store 
-	SAM_ARRAY+=($sample)
-	HIC_ARRAY+=($HIC_PATH)
-	COOL_ARRAY+=($COOL_PATH)
 	
-	# Run Calder
-	# Activate conda environment
-	       
 	echo "---------------------------------------------"
 	echo "Run calder on $sample"
 	echo "---------------------------------------------"
@@ -303,35 +346,30 @@ do
 	    else
 		echo "Skipping Dump for $sample"
 	    fi
-            
-	    # Run CALDER saddle for each his resolution
-	    echo "---------------------------------------------"
-	    echo "Run calder saddle on $sample at resolution ${res}"
-	    echo "---------------------------------------------"
-	    
-	    # Check to bed on the save side
-	    if [ -f ${CALDER_OUT}/sub_compartments/all_sub_compartments.bed ]; then
-
-		# Get compartemt calls
-		COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
-
-		SADDLE_OUT=${dir}/3_CalderSaddleOutput_r${res}
-		
-		if [ ! -d $SADDLE_OUT ]; then
-		    mkdir -p $SADDLE_OUT
-		fi
-		if [ $Saddle == "Saddle" ]; then
- 		    run_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} ${res} ${CALDER_RES} ${N_TILES}
-		else
-		    echo "Skipping Saddle for $sample"
-		fi
-		
-	    fi
-	done
-	
-	echo "Completed CALDER, Dump and Saddle for $sample"
+	    echo "Completed Dump for $sample"
+        done
+	# Run CALDER saddle for each his resolution
 	echo "---------------------------------------------"
-	echo "Compute insulation scores and insualtion boundries"
+	echo "Run calder saddle on $sample using resolution ${HIC_RES} hic resolution"
+	echo "---------------------------------------------"
+	if [ -f ${CALDER_OUT}/sub_compartments/all_sub_compartments.bed ]; then # Compartment check
+	    # Find compartment file
+	    COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
+	    SADDLE_OUT=${dir}/3_CalderSaddleOutput_r${HIC_RES}
+	    
+	    if [ ! -d $SADDLE_OUT ]; then
+		mkdir -p $SADDLE_OUT
+	    fi
+	    if [ "$Saddle" == "Saddle" ]; then
+ 		run_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} \
+			   ${HIC_RES} ${CALDER_RES} ${N_TILES}
+	    else
+		echo "Skipping Saddle for $sample"
+	    fi
+	    
+	fi
+	echo "---------------------------------------------"
+	echo "Run insulation module on $sample"
 	echo "---------------------------------------------"
 	
 	INS_PATH=${dir}/4_InsulationOutput
@@ -339,8 +377,7 @@ do
 	if [ ! -d $INS_PATH ]; then
 	    mkdir -p $INS_PATH
 	fi
-	
-	OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INSULATION_WINDOW_SIZE}
+	OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
 	if [ $Saddle == "Saddle" ]; then
 	    run_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
 	else
@@ -348,11 +385,13 @@ do
 	fi
     fi    
 done
-
 echo "Done"
 echo "---------------------------------------------------------------------------------------------------"
 echo "---> Run LCS analysis using python 3.0_LCS.py with the following arguments:                        |"
-echo "---> -c $LCS_COMPARISON -i $INPUT_DIR -o $OUT_PATH                                                 |"
+echo "---------------------------------------------------------------------------------------------------"
+echo "---> -c $COMPARISON_TABLE -i $INPUT_DIR. Using -g $GENOME as reference,                            |"
+echo "---> -r $HIC_RES resolution of cscores (saddle output) and -w $INS_W_SIZE for insulation scores.   |"
+echo "---> -o $OUT_PATH (save results to $OUT_PATH)                                                      |"
 echo "---------------------------------------------------------------------------------------------------"
 
 if [ ! -d $OUT_PATH ]; then
@@ -360,9 +399,11 @@ if [ ! -d $OUT_PATH ]; then
 fi
 
 # Run main LCS analysis
-python 3.0_RUN_LCS.py -c $LCS_COMPARISON \
+python 3.0_RUN_LCS.py -c $COMPARISON_TABLE \
         -g $GENOME \
         -d $INPUT_DIR \
+	-r $HIC_RES \
+	-w $INS_W_SIZE \
         -o $OUT_PATH
 
 # Merge plots into one report for convenience 
@@ -379,5 +420,4 @@ for res_dir in $OUT_PATH/*; do
 	   -f ${res_dir}/*pdf
     fi
 done
-
 mamba deactivate
