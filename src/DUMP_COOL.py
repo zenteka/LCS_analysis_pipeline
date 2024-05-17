@@ -10,6 +10,7 @@
      tsv file, having as columns [chr1, start1, end2, chr2, start2, end2, count, balanced, balanced_rescaled]
    - [OPTIONAL] resolution: at which resolution to dump (defaults to 10Mb)
 """
+### AUTHOR: Luca Nanni
 
 import argparse
 import logging
@@ -81,6 +82,7 @@ def main():
 	logger.info(f"Resolution: {resolution}")
 	logger.info(f"Output path: {output_path}")
 	logger.info(f"Chromosomes to exclude: {excludeChroms}")
+        
 	# logger.info(f"Genome: {genome}")
 
 	# if genome in ['hg19', 'hg38']:
@@ -89,9 +91,6 @@ def main():
 	# 	CHROMS = MM9_CHROMS
 	# else:
 	# 	raise ValueError("Unknown genome")
-
-
-
 	cool = Cooler(input_cool)
 
 	start_binsize = cool.binsize

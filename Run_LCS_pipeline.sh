@@ -5,7 +5,6 @@
 # Work inprogress
 # Email: karol.piera@unil.ch
 
-#set -e
 SCRIPT_DIR=$(dirname $0)
 
 # Parse arguments to variables
@@ -16,9 +15,19 @@ SCRIPT_DIR=$(dirname $0)
 
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
-	  echo "| Run LCS PIPELINE.                                                                                 |"
+	  echo "| Run Loss of chromatin segregation analysis.                                                       |"
+	  echo "| This script is a wrapper around Luca's LCS pipeline. It is meant to be run directly on            |"
+	  echo "| hic pipeline output directory. See test comparison.tsv for comparison.                            |"
+	  echo "| The main analysis is found in src/LCS_main.py.                                                    |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| USAGE: ./1.0_LCS.sh  -i DATA -o PLOTS_PATH -c COMPARISON_TABLE               # Analysis I/O       |"
+	  echo "| It requires output of 4 prior modules: Calder compartment calls, DUMP interchromosomal contacts,  |"
+	  echo "| compartment segregation scores from Calder Saddle and insulation (scores and boundires), 	    |"
+	  echo "| from insulation module.                                                                           |"
+	  echo "| Module 1 and module 4 is implented in this script, modules 2 and 3 are implemented as separate    |"
+	  echo "| scripts found in src directory.                                                                   |"
+	  echo "| IMPORTANT: To save time, if output exists, user is asked if they want to re-run modules 1-4!      |"
+	  echo "|---------------------------------------------------------------------------------------------------|"    
+	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA -o PLOTS_PATH -c COMPARISON_TABLE       # In/Out, Comparison |" 
 	  echo "|                      -g GENOME -b BIN_SIZE -p THREADS                        # CALDER flags       |"
 	  echo "|                      -D DUMP_RES                                             # Dump flag          |"
 	  echo "|                      -r HIC_RES -b BIN_SIZE                                  # Calder Saddle flag |"
@@ -174,12 +183,13 @@ done
 #-   exit 1
 #fi
 
-
-
 # Fixed parameters are those that do not change across analysis very often
 # If neeeded, they can be added to getpos as well to customize the input better
 # Fixexd parameters - DUMP
-EXCLUDED_CHROMOSOMES="chrM,chrY" # Chromosomes to exclude
+
+CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include 
+EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
+
 # Fixed parameters - SADDLE
 N_TILES=16
 # Fixed parameters - INSUALTION
@@ -250,24 +260,31 @@ fi
 
 
 # Define each module. LCS scritpt is executed only if all the modules were run or data strcutre with corresponding output is present.
+# Define each module. LCS_main.py scritpt is executed in either of the two cases:
+# 1) all the modules were run in consectutive manner
+# 2) module output was found in the input directory and user decided to skip the module.
+
 run_module_calder() {
     calder --input $1 \
 	   --bin_size $2 \
 	   --nproc $3 \
+	   -c $CHROMS \
 	   --genome $GENOME \
 	   --outpath $4 \
 	   --adaptive
 }
 
+
 run_module_dump() {
-	python 2.0_DUMP_COOL.py --resolution ${1} \
+    python ${SCRIPT_DIR}/src/DUMP_COOL.py \
+	   --resolution ${1} \
 	   --excludeChroms ${EXCLUDED_CHROMOSOMES} \
 	   "${2}::/resolutions/${DUMP_RES[0]}" \
 	   ${3}
 }
 
 run_saddle() {
-	python 2.1_CALDER_SADDLE.py ${1} ${2} ${3} \
+	python ${SCRIPT_DIR}/src/CALDER_SADDLE.py ${1} ${2} ${3} \
 	   --hic_resolution ${4} \
 	   --compartments_resolution ${5} \
 	   --n_tiles ${6} \
@@ -399,7 +416,7 @@ if [ ! -d $OUT_PATH ]; then
 fi
 
 # Run main LCS analysis
-python 3.0_RUN_LCS.py -c $COMPARISON_TABLE \
+python ${SCRIPT_DIR}/src/LCS_main.py \
         -g $GENOME \
         -d $INPUT_DIR \
 	-r $HIC_RES \
