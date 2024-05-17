@@ -1,16 +1,17 @@
 """Dumps Hi-C interactions at specified resolution and performs inter-chromosomal balancing.
+   Author: Luca Nanni
+
    The scripts dumps:
    - Raw counts for each pairs of bins
    - Balanced counts from IC correction for inter-chromosomal interactions
    - Rescaled balanced counts from IC correction for inter-chromosomal interactions
    
    This script takes as input:
-   - an Hi-C matrix path, in Cooler format
+   - an Hi-C matrix path, in cool or mcool format
    - the output path where to store the result, which is a 
      tsv file, having as columns [chr1, start1, end2, chr2, start2, end2, count, balanced, balanced_rescaled]
    - [OPTIONAL] resolution: at which resolution to dump (defaults to 10Mb)
 """
-### AUTHOR: Luca Nanni
 
 import argparse
 import logging
@@ -26,9 +27,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 TMP_COARSENED_PATH = ".coarsened.cool"
 
-# HG19_CHROMS = ["chr" + str(x) for x in range(1, 23)] + ['chrX']
-# MM9_CHROMS = ["chr" + str(x) for x in range(1, 20)] + ['chrX']
-
+# Init values
+HUMAN_CHROMS = ["chr" + str(x) for x in range(1, 23)] + ['chrX']
+MM_CHROMS = ["chr" + str(x) for x in range(1, 20)] + ['chrX']
 CHROMS = None
 
 def process_arguments():
@@ -36,8 +37,8 @@ def process_arguments():
 	parser.add_argument("cool_path", type=str, help='Path to the cool file')
 	parser.add_argument('output_path', type=str, help='Output path where to store the dumped result')
 	parser.add_argument('--resolution', type=int, const=10000000, nargs='?', help='Minimum distance between bins to include in the calculation')
-	parser.add_argument("--excludeChroms", type=str, default=None, help="Chromosomes to exclude")
-	# parser.add_argument('--genome', type=str, const="hg19", nargs='?', help='Reference genome')
+	#parser.add_argument("--excludeChroms", type=str, default=None, help="Chromosomes to exclude")
+	parser.add_argument('--genome', type=str, help='Reference genome')
 	args = parser.parse_args()
 	return args
 
@@ -75,22 +76,20 @@ def main():
 	input_cool = args.cool_path
 	output_path = args.output_path
 	resolution = args.resolution
-	excludeChroms = args.excludeChroms.split(",") if args.excludeChroms is not None else []
-	# genome = args.genome
-
+	#excludeChroms = args.excludeChroms.split(",") if args.excludeChroms is not None else []
+	genome = args.genome
 	logger.info(f"Input Hi-C: {input_cool}")
 	logger.info(f"Resolution: {resolution}")
 	logger.info(f"Output path: {output_path}")
-	logger.info(f"Chromosomes to exclude: {excludeChroms}")
-        
-	# logger.info(f"Genome: {genome}")
+	#logger.info(f"Chromosomes to exclude: {excludeChroms}")
+	logger.info(f"Genome: {genome}")
 
-	# if genome in ['hg19', 'hg38']:
-	# 	CHROMS = HG19_CHROMS
-	# elif genome in ['mm9', 'mm10']:
-	# 	CHROMS = MM9_CHROMS
-	# else:
-	# 	raise ValueError("Unknown genome")
+	if genome in ['hg19', 'hg38']:
+	 	CHROMS = HUMAN_CHROMS
+	elif genome in ['mm9', 'mm10']:
+	 	CHROMS = MM_CHROMS
+	else:
+                raise ValueError("Unknown genome")
 	cool = Cooler(input_cool)
 
 	start_binsize = cool.binsize
@@ -104,9 +103,9 @@ def main():
 
 	logger.info("Starting balancing")
 	bins = cool.bins()[:].rename(columns={'chrom':'chr'})
-	# if not bins.iloc[0].chr.startswith("chr"):
-	# 	bins['chr'] = 'chr' + bins.chr.astype(str)
-	# chroms_to_remove = set(bins.chr).difference(CHROMS)
+	if not bins.iloc[0].chr.startswith("chr"):
+                bins['chr'] = 'chr' + bins.chr.astype(str)
+	excludeChroms = set(bins.chr).difference(CHROMS)
 	blacklist = bins[bins.chr.isin(excludeChroms)].index.tolist()
 	logger.info("Blacklisting {} bins from chroms {}".format(len(blacklist), ", ".join(excludeChroms)))
 
@@ -123,9 +122,9 @@ def main():
 
 	logger.info("Loading result")
 	cool_ints = cool.matrix(balance='IC_trans', as_pixels=True, join=True)[:]
-	# if not cool_ints.chrom1.iloc[0].startswith("chr"):
-	# 	cool_ints['chrom1'] = "chr" + cool_ints.chrom1.astype(str)
-	# 	cool_ints['chrom2'] = "chr" + cool_ints.chrom2.astype(str)
+	if not cool_ints.chrom1.iloc[0].startswith("chr"):
+	 	cool_ints['chrom1'] = "chr" + cool_ints.chrom1.astype(str)
+	 	cool_ints['chrom2'] = "chr" + cool_ints.chrom2.astype(str)
 	cool_ints = cool_ints.rename(columns = {'chrom1': 'chr1', 'chrom2': 'chr2'})
 
 	cool_ints = cool_ints[(~cool_ints.chr1.isin(excludeChroms)) & (~cool_ints.chr2.isin(excludeChroms))]
