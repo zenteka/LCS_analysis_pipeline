@@ -347,7 +347,7 @@ do
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
-	    if [ $Dump == "Dump" ]; then
+	    if [ "$Dump" == "Dump" ]; then
 		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
 	    else
 		echo "Skipping Dump for $sample"
@@ -367,8 +367,7 @@ do
 		mkdir -p $SADDLE_OUT
 	    fi
 	    if [ "$Saddle" == "Saddle" ]; then
- 		run_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} \
-			   ${HIC_RES} ${CALDER_RES} ${N_TILES}
+ 		run_module_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} 
 	    else
 		echo "Skipping Saddle for $sample"
 	    fi
@@ -385,7 +384,7 @@ do
 	fi
 	OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
 	if [ $Saddle == "Saddle" ]; then
-	    run_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
+	    run_module_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
 	else
 	    echo "Skipping Insulation for $sample"
 	fi
