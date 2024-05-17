@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Wrapper around Luca's LCS pipeline
+# Wrapper around Luca's LCS pipeline.
+# Compute calder compartments, dump interchromosomal contacts, compute cscores and insulation boundaries/scroes.
 # AUTHOR: Karol Piera and Luca Nanni
-# Work inprogress
 # Email: karol.piera@unil.ch
 
 SCRIPT_DIR=$(dirname $0)
@@ -10,8 +10,6 @@ SCRIPT_DIR=$(dirname $0)
 # Parse arguments to variables
 # Add most important parameters to getopts.
 # Optionally one can trun fixed params such as genome into OPTARG as well.
-# TODO:
-## 1) Add more fixed parameters to getopts -d to control dump resolution, DONE: -g to control genome
 
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
@@ -46,20 +44,20 @@ usage () {
           echo "|    - Adaptive is set to true.                                                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 2) Run Dump Module: 	                                                    			    |"
-	  echo "|   -d Resolution at which to dump interchromosomal contacts. Defualt is 1000000000.                |"
-	  echo "|   If -D all - dump 1000000 100000000 1000000000.                                                  |"
+	  echo "|   -D Resolution at which to dump interchromosomal contacts. Defualt is 1000000000.                |"
+	  echo "|   -g GENOME                                                                                       |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 3) Run Calder_Saddle. This module requires output from Calder.				    |"
-	  echo "|    Compute compartment segregation scores. Outut cscores tsv file used by LCS script.		    |"
+	  echo "|    Compute compartment segregation scores. Outputs cscores tsv file.                              |"
 	  echo "|    -b BIN_SIZE - Calder resoultion                                                                |"
-	  echo "|    -r Hic resoultion to use. Default 1000 000.                                                    |" 
+	  echo "|    -r Hic resoultion to use. Default 1 000 000.                                                   |" 
 	  echo "|    - Number of tiles for compartment segregation is set to 16.                                    |"
 	  echo "|      Modify N_TILE parameter to change.                                                           |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 4) Run Insulation Module:                                                                         |"
 	  echo "|    -w Window size for insulation scores. Default 1000000.                                         |"
 	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR]. Default KR.                            |"
-	  echo "|    -b BIN_SIZE - Resolution of Calder. Default 50000. Minimum is 10000. (Re-used for insualtion)  |"
+	  echo "|    -b BIN_SIZE - Resolution of Calder. Default 50000. Minimum is 10000. 			    |"
 	  echo "|    Fixed params for insulation analysis (Modify in the script):                                   |"
 	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
@@ -70,10 +68,10 @@ usage () {
 	  echo "|                           2_Dumps                                                                 |"
 	  echo "|                           3_CalderSaddleOutput_r1000000 				     	    |"
 	  echo "|                           4_InsulationOutput 						    	    |"	
-	  echo "|                           aligned 						             	    |"
+	  echo "|                           aligned (hic_pipeline output) 					    |"
 	  echo "|                                        						            |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| 5) Run LCS analysis: -c Comparisons                                                               |"
+	  echo "| 5) Run LCS analysis: -c Comparisons table in tsv format.                                          |"
 	  echo "|                      -o PLOTS PATH                                                                |"
 	  echo "|                      -i Input data as above                                                       |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
@@ -258,7 +256,6 @@ else
     Saddle="Saddle"
 fi
 
-
 # Define each module. LCS scritpt is executed only if all the modules were run or data strcutre with corresponding output is present.
 # Define each module. LCS_main.py scritpt is executed in either of the two cases:
 # 1) all the modules were run in consectutive manner
@@ -274,24 +271,22 @@ run_module_calder() {
 	   --adaptive
 }
 
-
 run_module_dump() {
-    python ${SCRIPT_DIR}/src/DUMP_COOL.py \
-	   --resolution ${1} \
-	   --excludeChroms ${EXCLUDED_CHROMOSOMES} \
-	   "${2}::/resolutions/${DUMP_RES[0]}" \
-	   ${3}
+	python 2.0_DUMP_COOL.py --resolution ${1} \
+	       --genome ${GENOME} \
+	       "${2}::/resolutions/${DUMP_RES[0]}" \
+	       ${3}
 }
 
-run_saddle() {
-	python ${SCRIPT_DIR}/src/CALDER_SADDLE.py ${1} ${2} ${3} \
-	   --hic_resolution ${4} \
-	   --compartments_resolution ${5} \
-	   --n_tiles ${6} \
+run_module_saddle() {
+    python 2.1_CALDER_SADDLE.py ${1} ${2} ${3} \
+	   --hic_resolution ${HIC_RES} \
+	   --compartments_resolution ${CALDER_RES} \
+	   --n_tiles ${N_TILES} \
 	   --excludeChroms ${EXCLUDED_CHROMOSOMES}
 }
 
-run_insulation() {
+run_module_insulation() {
     # Compute insulation scores
     fanc insulation $1@${CALDER_RES}@${INS_NORMALISATION} \
 	 $3 \
@@ -300,7 +295,6 @@ run_insulation() {
 	 --offset 0 \
 	 --geom-mean \
 	 --trim-mean ${INS_TRIM_MEAN}
-    
     for f in `find ${2} -name "$(basename ${3})_*.bigwig"`
     do
 	mv ${f} ${3}.bigWig
@@ -309,7 +303,8 @@ run_insulation() {
     bigWigToBedGraph ${3}.bigWig ${3}.bedGraph.tmp
     
     cat ${3}.bedGraph.tmp | \
-	awk 'BEGIN {F = "\t"; OFS = "\t"} {if($4 != "nan"){gsub(/^chr/, "", $1); print "chr"$1,$2,$3,$4;}}' > ${3}.bedGraph
+	awk 'BEGIN {F = "\t"; OFS = "\t"} {if($4 != "nan"){gsub(/^chr/, "", $1); print "chr"$1,$2,$3,$4;}}'\
+	    > ${3}.bedGraph
     rm ${3}.bedGraph.tmp
 	
     # Compute insualtion boundaries
@@ -404,18 +399,16 @@ do
 done
 echo "Done"
 echo "---------------------------------------------------------------------------------------------------"
-echo "---> Run LCS analysis using python 3.0_LCS.py with the following arguments:                        |"
+echo "---> Running LCS_main.py analysis for following comparison:  					 |"
 echo "---------------------------------------------------------------------------------------------------"
-echo "---> -c $COMPARISON_TABLE -i $INPUT_DIR. Using -g $GENOME as reference,                            |"
-echo "---> -r $HIC_RES resolution of cscores (saddle output) and -w $INS_W_SIZE for insulation scores.   |"
-echo "---> -o $OUT_PATH (save results to $OUT_PATH)                                                      |"
-echo "---------------------------------------------------------------------------------------------------"
+
+cat $COMPARISON_TABLE
 
 if [ ! -d $OUT_PATH ]; then
 	mkdir -p $OUT_PATH
 fi
 
-# Run main LCS analysis
+# Run LCS_main.py main analysis
 python ${SCRIPT_DIR}/src/LCS_main.py \
         -g $GENOME \
         -d $INPUT_DIR \
