@@ -1,6 +1,7 @@
 """Dumps Hi-C interactions at specified resolution and performs inter-chromosomal balancing.
    Author: Luca Nanni
 
+
    The scripts dumps:
    - Raw counts for each pairs of bins
    - Balanced counts from IC correction for inter-chromosomal interactions
@@ -90,8 +91,9 @@ def main():
 	 	CHROMS = MM_CHROMS
 	else:
                 raise ValueError("Unknown genome")
+        
 	cool = Cooler(input_cool)
-
+        
 	start_binsize = cool.binsize
 	logger.info(f"Starting binsize: {start_binsize}")
 

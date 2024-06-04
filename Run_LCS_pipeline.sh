@@ -90,6 +90,7 @@ while getopts ":b:c:D:g:i:o:p:r:w:n:h" opt; do
 	c )
 	    # LCS comparisons to perform
 	    COMPARISON_TABLE=$OPTARG
+	    echo "Extract comparisons from ${COMPARISON_TABLE}"
 	    # check file passed and is a tsv
 	    if [ $(echo $COMPARISON_TABLE | awk -F. '{print $NF}') == "tsv" ]; then
 		if [ ! -f $COMPARISON_TABLE ]; then
@@ -179,6 +180,7 @@ done
 
 # Fixed parameters are those that do not change across analysis very often
 # If neeeded, they can be added to getpos as well to customize the input better
+
 # Fixexd parameters - DUMP
 CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include 
 EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
@@ -250,6 +252,18 @@ else
     Saddle="Saddle"
 fi
 
+if [ $(find $INPUT_DIR -type d -name 4_InsulationOutput | wc -l) -gt 0 ]; then
+	ask_user "Insulation"
+	if [ $? -eq 0 ]; then
+	    Insulation="Insulation"
+	else
+	    Insulation="Stop"
+	fi
+else
+    Insulation="Insulation"
+fi
+
+
 # Define each module. LCS scritpt is executed only if all the modules were run or data strcutre with corresponding output is present.
 # Define each module. LCS_main.py scritpt is executed in either of the two cases:
 # 1) all the modules were run in consectutive manner
@@ -266,14 +280,14 @@ run_module_calder() {
 }
 
 run_module_dump() {
-	python 2.0_DUMP_COOL.py --resolution ${1} \
-	       --genome ${GENOME} \
-	       "${2}::/resolutions/${DUMP_RES[0]}" \
-	       ${3}
+    python src/DUMP_COOL.py --resolution ${1} \
+	   --genome ${GENOME} \
+	   "${2}::/resolutions/10000000" \
+	   ${3}
 }
 
 run_module_saddle() {
-    python 2.1_CALDER_SADDLE.py ${1} ${2} ${3} \
+    python src/CALDER_SADDLE.py ${1} ${2} ${3} \
 	   --hic_resolution ${HIC_RES} \
 	   --compartments_resolution ${CALDER_RES} \
 	   --n_tiles ${N_TILES} \
@@ -308,7 +322,7 @@ run_module_insulation() {
 	 --delta ${BOUNDARY_DELTA_WINDOW}
 }
 
-
+ 
 # Loop over hic pipeline results (input directory)
 for dir in $INPUT_DIR/*; 
 do
@@ -320,9 +334,6 @@ do
 	HIC_PATH=$( realpath $(find $dir -name "*30.hic") ) # Get hic file
 	COOL_PATH=$( realpath $(find $dir -name "*30.mcool") ) # Get cool file
 	
-	echo "---------------------------------------------"
-	echo "Run calder on $sample"
-	echo "---------------------------------------------"
 	
 	CALDER_OUT=${dir}/1_CalderOutput_${CALDER_RES}
 	
@@ -331,68 +342,68 @@ do
 	fi
 
 	if [ $Calder == "Calder" ]; then
+	    echo "---------------------------------------------"
+	    echo "Run calder on $sample"
+	    echo "---------------------------------------------"
 	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
 	else
-	    echo "Skipping Calder for $sample"
+	    echo "Skipping Calder for $sample sample"
 	fi
-	
-	# Dump interchromosomal contacts for given resolutions
-	for res in ${DUMP_RES[@]};
-	do
+		    	
+	if [ "$Dump" == "Dump" ]; then
 	    echo "---------------------------------------------"
-	    echo "Dump interchromosomal contacts at resolution ${res}"
+	    echo "Dump interchromosomal contacts at resolution $DUMP_ReS"
 	    echo "---------------------------------------------"
-	    
-            DUMP_OUT="${dir}/2_Dumps/"
+	    DUMP_OUT="${dir}/2_Dumps/"
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
-	    if [ "$Dump" == "Dump" ]; then
-		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
-	    else
-		echo "Skipping Dump for $sample"
-	    fi
-	    echo "Completed Dump for $sample"
-        done
-	# Run CALDER saddle for each his resolution
-	echo "---------------------------------------------"
-	echo "Run calder saddle on $sample using resolution ${HIC_RES} hic resolution"
-	echo "---------------------------------------------"
-	if [ -f ${CALDER_OUT}/sub_compartments/all_sub_compartments.bed ]; then # Compartment check
-	    # Find compartment file
+	    
+	    run_module_dump ${DUMP_RES[0]} ${COOL_PATH} "${DUMP_OUT}/binsize_${DUMP_RES[0]}.tsv"
+	else
+	    echo "Skipping Dump for $sample sample"
+	fi
+	
+	if [ -f ${CALDER_OUT}/sub_compartments/all_sub_compartments.bed ]; then 
+	    # Double-check if compartment file exsists (neccessary for Calder Saddle)
 	    COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
 	    SADDLE_OUT=${dir}/3_CalderSaddleOutput_r${HIC_RES}
 	    
-	    if [ ! -d $SADDLE_OUT ]; then
-		mkdir -p $SADDLE_OUT
-	    fi
 	    if [ "$Saddle" == "Saddle" ]; then
+		echo "---------------------------------------------"
+		echo "Run calder saddle on $sample using resolution ${HIC_RES} hic resolution"
+		echo "---------------------------------------------"
+		if [ ! -d $SADDLE_OUT ]; then
+		    mkdir -p $SADDLE_OUT
+		fi
  		run_module_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} 
 	    else
 		echo "Skipping Saddle for $sample"
 	    fi
-	    
+	else
+	    echo "No compartment file found for $sample sample. Skipping Saddle"
 	fi
-	echo "---------------------------------------------"
-	echo "Run insulation module on $sample"
-	echo "---------------------------------------------"
+
+	if [ $Insulation == "Insulation" ]; then
+	    INS_PATH=${dir}/4_InsulationOutput
 	
-	INS_PATH=${dir}/4_InsulationOutput
+	    if [ ! -d $INS_PATH ]; then
+		mkdir -p $INS_PATH
+	    fi
+	    OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
 	
-	if [ ! -d $INS_PATH ]; then
-	    mkdir -p $INS_PATH
-	fi
-	OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
-	if [ $Saddle == "Saddle" ]; then
+	    echo "---------------------------------------------"
+	    echo "Run insulation module on $sample"
+	    echo "---------------------------------------------"
 	    run_module_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
 	else
 	    echo "Skipping Insulation for $sample"
-	fi
-    fi    
+	fi    
+    fi
 done
 echo "Done"
 echo "---------------------------------------------------------------------------------------------------"
-echo "---> Running LCS_main.py analysis for following comparison:  					 |"
+echo "---> Running LCS_main.py analysis for following comparisons:  					 |"
 echo "---------------------------------------------------------------------------------------------------"
 
 cat $COMPARISON_TABLE
@@ -400,11 +411,13 @@ cat $COMPARISON_TABLE
 if [ ! -d $OUT_PATH ]; then
 	mkdir -p $OUT_PATH
 fi
-
+echo "${DUMP_RES[0]}"
 # Run LCS_main.py main analysis
 python ${SCRIPT_DIR}/src/LCS_main.py \
-        -g $GENOME \
-        -d $INPUT_DIR \
+        --INPUT_DIR ${INPUT_DIR} \
+        -c ${COMPARISON_TABLE} \
+        -d "${DUMP_RES[0]}" \
+	-g $GENOME \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
         -o $OUT_PATH
