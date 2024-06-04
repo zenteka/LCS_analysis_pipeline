@@ -58,13 +58,8 @@ usage () {
 #+end_src
 
 
-
 ** Sample Input
 
-Table in tsv format with desired comparisons. Please MAKE SURE that selected comparison correspond to directory names in the hic_pipeline output.
-
-| SAMPLE_1            | SAMPLE 2               |
-| e.g. CPA_RB_AB_mega | e.g.CPA_RB_WGD_AB_mega |
 
 
 
@@ -77,16 +72,40 @@ Clone repository and install dependencies.
   ./install_lcs_pipeline.sh
 #+end_src
 
+* Input
 
+For the analysis to run, the user needs to provide the following input:
+- output directory of hic_pipeline, provided to the script as -i flag. See: data input.
+- tsv table with desired comparisons. See: Sample comparisons input.
 
+** Data input
+
+Input directory structure must contain all samples with "aligned" with the thresholded contact maps in .hic and .mcool format.
+
+#+begin_src bash
+  ./{hic_sample}/aligned/inter_30.mcool
+                        /inter_30.hic
+#+end_src
+
+** Sample input
+
+Table in tsv format with desired comparisons. Please MAKE SURE that selected comparison correspond to directory/folder names in the hic_pipeline output. It is CRUCIAL for the pipline to work correctly. SAMPLE_1 is always a control sample.
+
+| SAMPLE_1 (control)  | SAMPLE 2               |
+| e.g. CPA_RB_AB_mega | e.g.CPA_RB_WGD_AB_mega |
+ 
 * Output
 
 ** Data
 
-Sample output after running the pipeline with the following flags:
--c 50000
--w 100000
--n KR
+Below is the output of the pipeline for one sample after running it with the following flags:
+
+Directory 1_CalderOutput contains calder output at a user specified resolution.
+Directory 2_Dumps contains Hi-C interactions. Each tsv file stores Raw counts, balanced counts and rescaled balanced counts at resolution provided -D and -d flags.
+Directory 3_CalderSaddleOutput stores the output CalderSaddle script computed at a given hic resolution (-r flag). Calder saddle script takes as input compartment file from 1_CalderOutput at a given resolution (-b flag).
+
+Directory 4_InsulationOutput stores the output of insulaion analysis with Fanc.
+
 
 #+begin_src bash
  ./{hic_sample}/1_CalderOutput_50000                        
@@ -98,8 +117,22 @@ Sample output after running the pipeline with the following flags:
                 aligned                                                                                                  
 #+end_src
 
-** Plots
 
-All the plots will be saved to the directory provided by the user. Number of directories will correspond to the number of comparisons specified,
-plus one extra direcotry for sample-level OE-interchromosomal comparisons.
+** LCS_main
+
+*** Main
+
+LCS_main requires all the above input to run correctly. The script conducts full loss of chromatin segregation analysis.
+
+**** Inter-chromosomal Loss of segregation 
+
+**** Compartment LCS
+
+**** Boundary LCS
+
+**** Intrachromosomal LCS
+
+*** Plots 
+All the plots will be saved to the directory provided by the user in -o flag. Number of directories will correspond to the number of comparisons specified in the tsv file,
+plus one direcotry for Interchromosomal LCS analysis  heatmap output for each sample, for each sample separately. 
 
