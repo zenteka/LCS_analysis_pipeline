@@ -20,9 +20,10 @@ logging.disable(logging.INFO)
 # Parse arguments
 parser = argparse.ArgumentParser(description='Run LCS analysis')
 parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
-parser.add_argument('-d','--DUMP_RES', type=int, help='Dump resolution to use.', default=10000000)
-parser.add_argument('-i', '--INPUT_DIR', type=str, help='Input data directory.')
+parser.add_argument('-d','--intra_chr_res', type=int, help='Intra-chromosomal resolution', default=10000000)
+parser.add_argument('-D','--INTER_CHR_RES', type=int, help='Inter-chromosomal resolution', default=1000000000)
 parser.add_argument('-g','--genome', type=str, help='Genome assembly')
+parser.add_argument('-i', '--INPUT_DIR', type=str, help='Input data directory.')
 parser.add_argument('-o','--output', type=str, help='Path to the output directory')
 parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of cscores', default=10000000)
 parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
@@ -490,7 +491,7 @@ def plot_percentage_trans_contacts(ax, all_phasing_stats_filter):
 
 # Constans
 TOP_K=300
-INTRA_CHR_RES = 1000000
+#INTRA_CHR_RES = 1000000
 MAX_DISTANCE = 20000000
 
 # OUTPUT
@@ -503,9 +504,8 @@ DATA_PATH = parser.parse_args().INPUT_DIR
 
 HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
 
-# Output of src/DUMP_COOL.py - inter-chromosomal interactions
-bin_size=parser.parse_args().DUMP_RES
-INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"2_Dumps/binsize_{bin_size}.tsv"
+# Output of src/DUMP_COOL.py - inter-chromosomal interactions 
+INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"2_Dumps/binsize_{parser.parse_args().INTER_CHR_RES}.tsv"
 
 # Compartment scores - output src/CALDER_SADDLE.py - compartment segregation
 COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"3_CalderSaddleOutput_r{parser.parse_args().HicResolution}/compartment_scores.tsv"
@@ -517,7 +517,7 @@ INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulatio
 REPORT = {}
 OVERWRITE = True
 
-# %% Run the analysis
+# %% Main analysis
 for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuples()):
 	print("---------------------------------")
 	print(f"{t.full_name1} VS {t.full_name2}")
@@ -637,7 +637,7 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 	if OVERWRITE or (not os.path.exists(name)):
 		all_shared_interactions = get_all_shared_intra_interactions(HIC_MAPS_PATH.format(hic_sample=t.full_name1), 
 									    HIC_MAPS_PATH.format(hic_sample=t.full_name2), 
-									INTRA_CHR_RES,
+                                                                            parser.parse_args().intra_chr_res,
 								['chrY', 'chrM'])
 		
 		nonzero_shared_interactions = all_shared_interactions[(all_shared_interactions.control > 0) & (all_shared_interactions.wgd > 0)].copy()

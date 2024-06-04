@@ -77,7 +77,8 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 }
 
-while getopts ":b:c:D:g:i:o:p:r:w:n:h" opt; do
+declare -a DUMP_RES 
+while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
     case ${opt} in
 	b )
 	    # Calder resolution 
@@ -103,9 +104,13 @@ while getopts ":b:c:D:g:i:o:p:r:w:n:h" opt; do
 	    fi
 		    
 	    ;;
+	d )
+	    # Dump resolution for inter-chromosomal contacts
+	    DUMP_RES+=($OPTARG)
+	    ;;
 	D )
-	    # Dump resolution
-	    DUMP_RES=( $OPTARG )
+	    # Dump resolution for intra-chromosomal contacts
+	    DUMP_RES+=($OPTARG)
 	    ;;
 	g )
 	    # Genome
@@ -230,7 +235,8 @@ else
     Calder="Calder"
 fi
 
-if [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[0]}.tsv | wc -l) -gt 0 ]; then
+if [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[0]}.tsv | wc -l) -gt 0 ] &&
+   [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[1]}.tsv | wc -l) -gt 0 ]; then
     ask_user "Dump"
     if [ $? -eq 0 ]; then
 	Dump="Dump"
@@ -358,8 +364,9 @@ do
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
-	    
-	    run_module_dump ${DUMP_RES[0]} ${COOL_PATH} "${DUMP_OUT}/binsize_${DUMP_RES[0]}.tsv"
+	    for res in ${DUMP_RES[@]}; do
+		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
+	    done
 	else
 	    echo "Skipping Dump for $sample sample"
 	fi
@@ -411,12 +418,13 @@ cat $COMPARISON_TABLE
 if [ ! -d $OUT_PATH ]; then
 	mkdir -p $OUT_PATH
 fi
-echo "${DUMP_RES[0]}"
+
 # Run LCS_main.py main analysis
 python ${SCRIPT_DIR}/src/LCS_main.py \
         --INPUT_DIR ${INPUT_DIR} \
-        -c ${COMPARISON_TABLE} \
-        -d "${DUMP_RES[0]}" \
+        --comparison ${COMPARISON_TABLE} \
+        --intra_chr_res "${DUMP_RES[0]}" \
+	--INTER_CHR_RES "${DUMP_RES[1]}" \
 	-g $GENOME \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
