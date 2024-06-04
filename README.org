@@ -87,7 +87,7 @@ Input directory structure must contain all samples with "aligned" with the thres
                         /inter_30.hic
 #+end_src
 
-** Sample input
+** Sample comparison input
 
 Table in tsv format with desired comparisons. Please MAKE SURE that selected comparison correspond to directory/folder names in the hic_pipeline output. It is CRUCIAL for the pipline to work correctly. SAMPLE_1 is always a control sample.
 
@@ -100,11 +100,16 @@ Table in tsv format with desired comparisons. Please MAKE SURE that selected com
 
 Below is the output of the pipeline for one sample after running it with the following flags:
 
-Directory 1_CalderOutput contains calder output at a user specified resolution.
-Directory 2_Dumps contains Hi-C interactions. Each tsv file stores Raw counts, balanced counts and rescaled balanced counts at resolution provided -D and -d flags.
-Directory 3_CalderSaddleOutput stores the output CalderSaddle script computed at a given hic resolution (-r flag). Calder saddle script takes as input compartment file from 1_CalderOutput at a given resolution (-b flag).
+**** Directory 1_CalderOutput_{bin_size}
+Contains calder output at a user specified resolution. Resolution controlled by -b flag.
+**** Directory 2_Dumps
+Contains Hi-C interactions. Each tsv file stores Raw counts, balanced counts and rescaled balanced counts at resolution provided -D and -d flags.
 
-Directory 4_InsulationOutput stores the output of insulaion analysis with Fanc.
+**** Directory 3_CalderSaddleOutput_r{resolution}
+Stores the output CalderSaddle script computed at a given hic resolution (-r flag). Calder saddle script takes as an input compartment file from 1_CalderOutput computed at a given bin_size (-b flag).
+
+**** Directory 4_InsulationOutput
+Stores the output of insulation analysis with Fanc.
 
 
 #+begin_src bash
@@ -124,13 +129,13 @@ Directory 4_InsulationOutput stores the output of insulaion analysis with Fanc.
 
 LCS_main requires all the above input to run correctly. The script conducts full loss of chromatin segregation analysis.
 
-**** Inter-chromosomal Loss of segregation 
+**** Inter-chromosomal Inter-chromomsomal LCS
 
 **** Compartment LCS
 
 **** Boundary LCS
 
-**** Intrachromosomal LCS
+**** Intra-chromosomal LCS
 
 *** Plots 
 All the plots will be saved to the directory provided by the user in -o flag. Number of directories will correspond to the number of comparisons specified in the tsv file,
