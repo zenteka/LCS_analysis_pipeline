@@ -1,28 +1,29 @@
 #!/bin/bash
-
-# Wrapper around Luca's LCS pipeline.
-# Compute calder compartments, dump interchromosomal contacts, compute cscores and insulation boundaries/scores.
+# Wrapper around Luca's LCS pipeline that is part of the WGD project.
 # AUTHOR: Karol Piera and Luca Nanni
 # Email: karol.piera@unil.ch
 
+# LCS pipeline is a module-based analysis. Ouptut of module 1 to 4 is required to run the main LCS analysis.
+
 SCRIPT_DIR=$(dirname $0)
 
-# Parse arguments to variables
-# Add most important parameters to getopts.
-# Optionally one can trun fixed params such as genome into OPTARG as well.
-
+# Description
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
 	  echo "| Run Loss of chromatin segregation analysis.                                                       |"
-	  echo "| This script is a wrapper around Luca's LCS pipeline. It is meant to be run directly on            |"
-	  echo "| hic pipeline output directory. See test comparison.tsv for comparison.                            |"
+	  echo "| This script is a wrapper around WGD LCS pipeline. It is meant to be run directly on               |"
+	  echo "| hic pipeline output. See test comparison.tsv for comparison.                                      |"
 	  echo "| The main analysis is found in src/LCS_main.py.                                                    |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| It requires output of 4 prior modules: Calder compartment calls, DUMP interchromosomal contacts,  |"
-	  echo "| compartment segregation scores from Calder Saddle and insulation (scores and boundires), 	    |"
-	  echo "| from insulation module.                                                                           |"
-	  echo "| Module 1 and module 4 are  implemented in fanc. Other modules are implemented in python.          |"
-	  echo "| Scripts can be found in src/ directory.                                                           |"
+	  echo "| The pipeline consists of 5 steps. Output of first 4 steps is REQUIRED to run the main analysis.   |"
+	  echo "| The steps are:                                                                                    |"
+	  echo "| 1) Calder - Compute compartments and subcompartments. (Can be skipped if output exists)           |"
+	  echo "| 2) Dump - Dump interchromosomal contacts. (Can be skipped if output exists)                       |"
+	  echo "| 3) Calder Saddle - Compute compartment segregation scores (Can be skipped if output exists)       |"
+	  echo "| 4) Insulation - Compute insulation scores. (Can be skipped if output exists)                      |"
+	  echo "| 5) LCS analysis - Reuires output of all the above steps.                                          |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| Each module is described below.                                                                   |"
 	  echo "| IMPORTANT: To save time, if output exists, user is asked if they want to re-run modules 1-4!      |"
 	  echo "|---------------------------------------------------------------------------------------------------|"    
 	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA -o PLOTS_PATH -c COMPARISON_TABLE       # In/Out, Comparison |" 
@@ -77,7 +78,6 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 }
 
-declare -a DUMP_RES 
 while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
     case ${opt} in
 	b )
@@ -104,14 +104,8 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
 	    fi
 		    
 	    ;;
-	d )
-	    # Dump resolution for inter-chromosomal contacts
-	    DUMP_RES+=($OPTARG)
-	    ;;
-	D )
-	    # Dump resolution for intra-chromosomal contacts
-	    DUMP_RES+=($OPTARG)
-	    ;;
+	d ) INTRA_CHR_RES=$OPTARG;; # Intra chromosomal resolution
+	D ) INTER_CHR_RES=$OPTARG;; # Interchromosomal resolution
 	g )
 	    # Genome
 	    if [ $OPTARG == "hg19" ]; then
@@ -134,18 +128,9 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
 	    fi
 	    ;;
    
-	p )
-	  # Thread control
-	    NPROC=$OPTARG
-	    ;;
-	r )
-	    # Hic resolution
-	    HIC_RES=$OPTARG
-	    ;;
-	w )
-	    # Insulation window size
-	    INS_W_SIZE=$OPTARG
-	    ;;
+	p ) NPROC=$OPTARG;; # Number of threads
+	r ) HIC_RES=$OPTARG;; # Hic resolution
+	w ) INS_W_SIZE=$OPTARG;;
 	n)
 	    # Normalisation for insulation scores
 	    INS_NORMALISATION=$OPTARG
@@ -177,22 +162,13 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
     esac
 done
 
-#if [ "$INPUT_DIR == "" " ] || [ "$OUT_PATH" == "" ] || [ "$COMPARISON_TABLE" == "" ]; then
-#    echo "Missing required arguments"
-#    usage
-#-   exit 1
-#fi
-
-# Fixed parameters are those that do not change across analysis very often
-# If neeeded, they can be added to getpos as well to customize the input better
-
-# Fixexd parameters - DUMP
-CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include 
+# Fixexd parameters:
+## DUMP:
+CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include - used for Calder
 EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
-
-# Fixed parameters - SADDLE
+## SADDLE
 N_TILES=16
-# Fixed parameters - INSUALTION
+## INSULATION
 INS_OUTPUT_FORMAT="bigwig"
 INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
@@ -202,8 +178,6 @@ source ~/mambaforge/etc/profile.d/conda.sh
 source ~/mambaforge/etc/profile.d/mamba.sh
 mamba activate lcs_pipeline
 
-# Define functions
-# Ask user if they want to proceed - helper function
 ask_user () {
         echo "$1 output found."
 	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
@@ -235,8 +209,7 @@ else
     Calder="Calder"
 fi
 
-if [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[0]}.tsv | wc -l) -gt 0 ] &&
-   [ $(find $INPUT_DIR -type f -name binsize_${DUMP_RES[1]}.tsv | wc -l) -gt 0 ]; then
+if [ $(find $INPUT_DIR -type f -name binsize_${INTER_CHR_RES}.tsv | wc -l) -gt 0 ]; then
     ask_user "Dump"
     if [ $? -eq 0 ]; then
 	Dump="Dump"
@@ -268,12 +241,6 @@ if [ $(find $INPUT_DIR -type d -name 4_InsulationOutput | wc -l) -gt 0 ]; then
 else
     Insulation="Insulation"
 fi
-
-
-# Define each module. LCS scritpt is executed only if all the modules were run or data strcutre with corresponding output is present.
-# Define each module. LCS_main.py scritpt is executed in either of the two cases:
-# 1) all the modules were run in consectutive manner
-# 2) module output was found in the input directory and user decided to skip the module.
 
 run_module_calder() {
     calder --input $1 \
@@ -364,9 +331,7 @@ do
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
-	    for res in ${DUMP_RES[@]}; do
-		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
-	    done
+	    run_module_dump ${INTER_CHR_RES} ${COOL_PATH} "${DUMP_OUT}/binsize_${INTER_CHR_RES}.tsv"
 	else
 	    echo "Skipping Dump for $sample sample"
 	fi
@@ -408,23 +373,18 @@ do
 	fi    
     fi
 done
-echo "Done"
-echo "---------------------------------------------------------------------------------------------------"
-echo "---> Running LCS_main.py analysis for following comparisons:  					 |"
-echo "---------------------------------------------------------------------------------------------------"
 
-cat $COMPARISON_TABLE
-
-if [ ! -d $OUT_PATH ]; then
-	mkdir -p $OUT_PATH
-fi
+echo "---------------------------------------------------------------------------------------------------"
+echo "---> Required modules have been run. Proceeding with main analysis <---                            |"
+echo "---> Runnning LCS_main.py on $INPUT_DIR <---                                                       |"
+echo "---------------------------------------------------------------------------------------------------"
 
 # Run LCS_main.py main analysis
 python ${SCRIPT_DIR}/src/LCS_main.py \
         --INPUT_DIR ${INPUT_DIR} \
         --comparison ${COMPARISON_TABLE} \
-        --intra_chr_res "${DUMP_RES[0]}" \
-	--INTER_CHR_RES "${DUMP_RES[1]}" \
+        --intra_chr_res ${INTRA_CHR_RES} \
+	--INTER_CHR_RES ${INTER_CHR_RES} \
 	-g $GENOME \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
