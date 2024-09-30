@@ -1,4 +1,3 @@
-
 import logging
 import os
 import argparse
@@ -37,7 +36,7 @@ elif parser.parse_args().genome == "hg19":
         print("Genome assembly: hg19")
 else:
         print("Genome assembly not recognized. Please provide a valid genome assembly (hg19 or hg38)")
-        sys.exit(1)
+        raise ValueError
         
 CHROMS_BY_SIZE = CHROMSIZES.sort_values('length', ascending=False).chr.tolist()
 LONG_CHROMS = CHROMS_BY_SIZE[:15]
@@ -245,12 +244,7 @@ def get_interaction_type(x):
 def plot_inter_chromosomal_map_chrom_level_oe(sample_dump, sample_name):
         '''
         Plot the inter-chromosomal map of the Hi-C data
-        '''
-        # Compute scaling facotr for plot's legend
-        # Depending on the bin size used in DUMP
-        
-        #sc_factor = (sample_dump.end1.iloc[1] - sample_dump.start1.iloc[1]) / 100000000
-        
+        '''     
         M = pd.pivot_table(sample_dump, index='chr1', columns='chr2', values='balanced_rescaled',
                            observed=True).sort_index(axis=0).sort_index(axis=1)
         n_chroms = M.shape[0] - 1
@@ -272,6 +266,8 @@ def plot_inter_chromosomal_map_chrom_level_oe(sample_dump, sample_name):
         ax.set_ylabel("Chromosome 1")
         
         return fig, ax
+
+        
 
 # Plot function from LCS pipeline; WGD paper
 #def plot_inter_chromosomal_map_chrom_level_oe(ax, sample_dump):
@@ -410,7 +406,7 @@ def plot_shared_boundaries_insulation(ax,
 	ax.set_xlim(xmin, xmax)
 	ax.set_ylim(ymin, ymax)
 	ax.text(x=topk_thresh - 0.8, y = ymin + 0.4, s = f"Top-{TOP_K}\nboundaries", ha='center')
-
+	
 	pvalue = wilcoxon(shared_boundaries.control_ins.values, shared_boundaries.wgd_ins.values).pvalue
 	ax.text(1, 1.05, f'Wilcoxon p = {pvalue:.2E}',
 		     horizontalalignment='right',
@@ -437,9 +433,9 @@ def plot_shared_TOPK_boundaries_insulation(ax,
 	xmin, xmax = min(topk_boundaries.control_ins.min(), topk_boundaries.wgd_ins.min()), max(topk_boundaries.control_ins.max(), topk_boundaries.wgd_ins.max())
 	ax.plot([xmin, xmax], [xmin, xmax], linestyle = '--', color = 'black', linewidth=2)
 	# add number of gains of the linestyle
-	ax.text(x = 0.5, y = 0.9, s = f"n = {topk_boundaries[topk_boundaries.insulation_change == 'gain'].shape[0]}", transform=ax.transAxes, ha='center')
+	ax.text(x = 0.5, y = 0.1, s = f"n = {topk_boundaries[topk_boundaries.insulation_change == 'gain'].shape[0]}", transform=ax.transAxes, ha='center')
 	# add number of losses below line
-	ax.text(x = 0.5, y = 0.1, s = f"n = {topk_boundaries[topk_boundaries.insulation_change == 'loss'].shape[0]}", transform=ax.transAxes, ha='center')
+	ax.text(x = 0.5, y = 0.9, s = f"n = {topk_boundaries[topk_boundaries.insulation_change == 'loss'].shape[0]}", transform=ax.transAxes, ha='center')
 	
 	
 	pvalue = wilcoxon(topk_boundaries.control_ins.values, topk_boundaries.wgd_ins.values).pvalue
@@ -487,21 +483,17 @@ def plot_percentage_trans_contacts(ax, all_phasing_stats_filter):
 	ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', va='top', rotation_mode = 'anchor')
 	sns.despine(ax=ax)
 
-# %% Run main analysis
-
+# %% Run main
 # Constans
 TOP_K=300
-#INTRA_CHR_RES = 1000000
 MAX_DISTANCE = 20000000
 
 # OUTPUT
-OUTPUT_PATH = parser.parse_args().output                             # Save allthe main plots
-INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"# Save the inter-chromosomal Observed/Expected plots for each sample
+OUTPUT_PATH = parser.parse_args().output                                                          # Save allthe main plots
+INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"                             # Save the inter-chromosomal Observed/Expected plots for each sample
 os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
 # INPUT
-LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep="\t")
 DATA_PATH = parser.parse_args().INPUT_DIR
-
 HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
 
 # Output of src/DUMP_COOL.py - inter-chromosomal interactions 
@@ -514,35 +506,48 @@ COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"3_CalderSaddleO
 BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}_boundaries.bed"
 INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}.bigWig"
 
+# Get comparison file
+if parser.parse_args().comparison.endswith('.tsv'):
+	LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=[0], sep="\t")
+	print(LCS_COMPARISONS)
+elif parser.parse_args().comparison.endswith('.csv'):
+        LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep=",")
+elif parser.parse_args().comparison.endswith('.xlsx'):
+        LCS_COMPARISONS = pd.read_excel(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'])
+else:
+	print("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
+	raise ValueError("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
+
 REPORT = {}
 OVERWRITE = True
 
 # %% Main analysis
-for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuples()):
+for t in chain(LCS_COMPARISONS.itertuples()):
 	print("---------------------------------")
-	print(f"{t.full_name1} VS {t.full_name2}")
+	print(f"{t.sample1} VS {t.sample2}")
 	print("---------------------------------")
 
-	REPORT[f"{t.full_name1} VS {t.full_name2}"] = []
+	REPORT[f"{t.sample1} VS {t.sample2}"] = []
 
-	print("- Inter-chromosomal LCS")
+	print("------ Inter-chromosomal contacts ------")
        
-	sample_dump1 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.full_name1)), chrom_order=CHROMS_BY_SIZE)
-	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.full_name1}_InterChromosomal_OE.pdf")
-	if OVERWRITE or (not os.path.exists(name)):
-		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump1, t.full_name1)
-		fig.savefig(name)
-		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
+	sample_dump1 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.sample1)), chrom_order=CHROMS_BY_SIZE)
+	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.sample1}_InterChromosomal_OE.pdf")
 
-	sample_dump2 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.full_name2)), 
-												  chrom_order=CHROMS_BY_SIZE)
-	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.full_name2}_InterChromosomal_OE.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
-		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump2, t.full_name2)
+		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump1, t.sample1)
 		fig.savefig(name)
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	
+	sample_dump2 = load_hic_interchromosomal_dump(os.path.join(INTER_CHROMOSOMAL_DUMPS_PATH.format(hic_sample = t.sample2)), 
+						      chrom_order=CHROMS_BY_SIZE)
+	name = os.path.join(INTER_CHROMOSOMAL_OE_OUTPUT, f"{t.sample2}_InterChromosomal_OE.pdf")
+	if OVERWRITE or (not os.path.exists(name)):
+		fig, ax = plot_inter_chromosomal_map_chrom_level_oe(sample_dump2, t.sample2)
+		fig.savefig(name)
+		plt.close(fig)
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
 
 	s12_dump = sample_dump1[['chr1', 'chr2', 'balanced_rescaled']].rename(columns = {'balanced_rescaled': 'score1'})\
 				.merge(sample_dump2[['chr1', 'chr2', 'balanced_rescaled']].rename(columns = {'balanced_rescaled': 'score2'}), 
@@ -552,91 +557,91 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 						chr2_length_type=lambda x: x.chr2.map(lambda y: 'L' if y in LONG_CHROMS else 'S'),
 						pair_length_type=lambda x: x.apply(lambda y: "".join(sorted([y.chr1_length_type, y.chr2_length_type])), axis=1))
 
-	comparison_path=os.path.join(OUTPUT_PATH, f"{t.full_name1}_VS_{t.full_name2}")
+	comparison_path=os.path.join(OUTPUT_PATH, f"{t.sample1}_VS_{t.sample2}")
 	os.makedirs(comparison_path, exist_ok=True)
 
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_InterChromosomal_Ratio.pdf")
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_InterChromosomal_Ratio.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
 		fig, ax = plot_inter_chromosomal_map_chrom_level_foldchange(s12_dump)
 		fig.savefig(name)
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
 
-	print("- Compartment LCS")
-
-	compartment_scores1 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.full_name1), sep="\t")\
+	print("------ Compartment scores ------")
+	
+	compartment_scores1 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.sample1), sep="\t")\
 								.assign(key = lambda x: x.chr + ":" + \
 														x.start.astype(str) + "-" + \
 														x.end.astype(str) + "_" + \
 														x.compartment)
-	compartment_scores2 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.full_name2), sep="\t")\
+	compartment_scores2 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.sample2), sep="\t")\
 								.assign(key = lambda x: x.chr + ":" + \
 														x.start.astype(str) + "-" + \
 														x.end.astype(str) + "_" + \
 														x.compartment)
 	shared_bin_scores = get_shared_bins(compartment_scores1, compartment_scores2)
 	comp_stats = get_compartment_stats(shared_bin_scores)
-
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_Compartment_Scores.pdf")
+	
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_Compartment_Scores.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
 		fig, ax = plt.subplots(1, 1, figsize=(5, 5))
 		plot_compartment_scores(ax, comp_stats)
 		fig.savefig(name, bbox_inches='tight')
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	
 	pairwise_compartment_segregation_changes = get_pairwise_compartment_segregation_changes(
 																  compartment_scores1, 
 																  compartment_scores2, 
 																  shared_bin_scores.key.values)
 	
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_Compartment_PairedScores.pdf")
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_Compartment_PairedScores.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
 		fig, ax = plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes)
 		fig.savefig(name, bbox_inches='tight')
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	
         
-	print("- Boundary LCS")
-
-	sample1_insulation = load_bigwig(INSULATION_PATH.format(hic_sample=t.full_name1))
-	sample1_boundaries = load_boundaries(BOUNDARIES_PATH.format(hic_sample=t.full_name1))
-	sample2_insulation = load_bigwig(INSULATION_PATH.format(hic_sample=t.full_name2))
-	sample2_boundaries = load_boundaries(BOUNDARIES_PATH.format(hic_sample=t.full_name2))
-
+	print("----- Boundary LCS -----")
+	
+	sample1_insulation = load_bigwig(INSULATION_PATH.format(hic_sample=t.sample1))
+	sample1_boundaries = load_boundaries(BOUNDARIES_PATH.format(hic_sample=t.sample1))
+	sample2_insulation = load_bigwig(INSULATION_PATH.format(hic_sample=t.sample2))
+	sample2_boundaries = load_boundaries(BOUNDARIES_PATH.format(hic_sample=t.sample2))
+	
 	shared_boundaries = get_shared_boundaries(sample1_boundaries, sample1_insulation, sample2_boundaries, sample2_insulation)
-
+	
 	with pd.option_context('mode.use_inf_as_na', True):
 		shared_boundaries = shared_boundaries.dropna(subset=['control_ins', 'wgd_ins'])
-
+	
 	# finding the threshold of top-k boundaries
 	control_thresh = shared_boundaries[shared_boundaries.control_ins_rank <= TOP_K].control_ins.max()
 	wgd_thresh = shared_boundaries[shared_boundaries.wgd_ins_rank <= TOP_K].wgd_ins.max()
 	topk_thresh = max(control_thresh, wgd_thresh)
-
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_Insulation_AllBoundaries.pdf")
+	
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_Insulation_AllBoundaries.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
 		fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-		plot_shared_boundaries_insulation(ax, shared_boundaries, topk_thresh, xname=t.full_name1, yname=t.full_name2)
+		plot_shared_boundaries_insulation(ax, shared_boundaries, topk_thresh, xname=t.sample1, yname=t.sample2)
 		fig.savefig(name)
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_Insulation_Top{TOP_K}.pdf")
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_Insulation_Top{TOP_K}.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
 		fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-		plot_shared_TOPK_boundaries_insulation(ax, shared_boundaries, topk_thresh, xname=t.full_name1, yname=t.full_name2)
+		plot_shared_TOPK_boundaries_insulation(ax, shared_boundaries, topk_thresh, xname=t.sample1, yname=t.sample2)
 		fig.savefig(name)
 		plt.close(fig)
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
-	print("- Intrachromosomal LCS")
-
-	name = os.path.join(comparison_path, f"{t.full_name1}_VS_{t.full_name2}_IntraChromosomal_OE.pdf")
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	
+	print("----- Intra-chromosomal contacts ------")
+	
+	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_IntraChromosomal_OE.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
-		all_shared_interactions = get_all_shared_intra_interactions(HIC_MAPS_PATH.format(hic_sample=t.full_name1), 
-									    HIC_MAPS_PATH.format(hic_sample=t.full_name2), 
+		all_shared_interactions = get_all_shared_intra_interactions(HIC_MAPS_PATH.format(hic_sample=t.sample1), 
+									    HIC_MAPS_PATH.format(hic_sample=t.sample2), 
                                                                             parser.parse_args().intra_chr_res,
 								['chrY', 'chrM'])
 		
@@ -648,13 +653,11 @@ for t in chain(LCS_COMPARISONS.itertuples()):# LCS_CONTROL_COMPARISONS.itertuple
 		nonzero_shared_interactions['fc_of_logs'] = nonzero_shared_interactions.log2_wgd / nonzero_shared_interactions.log2_control
 		nonzero_shared_interactions['change_type'] = nonzero_shared_interactions.apply(lambda x: "loss of signal" if abs(x.log2_control) > abs(x.log2_wgd) else "gain of signal", axis=1)
 		nonzero_shared_interactions_mindist = nonzero_shared_interactions[(nonzero_shared_interactions.distance <= MAX_DISTANCE)]
-
+		
 		fig, ax = plt.subplots(figsize=(5, 5))
-		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.full_name1, sample2 = t.full_name2)
+		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.sample1, sample2 = t.sample2)
                 
 		fig.savefig(name)
 		plt.close(fig)
                 
-	REPORT[f"{t.full_name1} VS {t.full_name2}"].append(name)
-
-
+	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
