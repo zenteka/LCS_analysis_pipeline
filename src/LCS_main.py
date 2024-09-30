@@ -29,11 +29,12 @@ parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of c
 parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
 
 # %% Define variables
+
 if parser.parse_args().genome == "hg38":
-        CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/LCS_pipeline/ref/hg38.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
+        CHROMSIZES = pd.read_csv("/cso/gscratch/Karol/LCS_analysis_beta/ref/hg38.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
         print("Genome assembly: hg38")
 elif parser.parse_args().genome == "hg19":
-        CHROMSIZES = pd.read_csv("/mnt/data2/karol/Projects/LCS_pipeline/ref/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
+        CHROMSIZES = pd.read_csv("/cso/gscratch/Karol/LCS_analysis_beta/ref/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
         print("Genome assembly: hg19")
 else:
         print("Genome assembly not recognized. Please provide a valid genome assembly (hg19 or hg38)")

@@ -80,16 +80,13 @@ usage () {
 declare -a DUMP_RES 
 while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
     case ${opt} in
-	b )
-	    # Calder resolution 
-	    CALDER_RES=$OPTARG
+	b ) CALDER_RES=$OPTARG
 	    if [ $CALDER_RES -lt 10000 ]; then
 		echo "Calder resolution must be at least 10000"
 		exit 1
 	    fi
 	    ;;
 	c )
-	    # LCS comparisons to perform
 	    COMPARISON_TABLE=$OPTARG
 	    echo "Extract comparisons from ${COMPARISON_TABLE}"
 	    # check file passed and is a tsv
@@ -134,30 +131,16 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
 	    fi
 	    ;;
    
-	p )
-	  # Thread control
-	    NPROC=$OPTARG
-	    ;;
-	r )
-	    # Hic resolution
-	    HIC_RES=$OPTARG
-	    ;;
-	w )
-	    # Insulation window size
-	    INS_W_SIZE=$OPTARG
-	    ;;
-	n)
-	    # Normalisation for insulation scores
-	    INS_NORMALISATION=$OPTARG
-	    # check if normalisation is valid
+	p ) NPROC=$OPTARG;;
+	r ) HIC_RES=$OPTARG;;
+	w ) INS_W_SIZE=$OPTARG;;
+	n)  INS_NORMALISATION=$OPTARG
 	    if [ $INS_NORMALISATION != "KR" ] && [ $INS_NORMALISATION != "VC_SQRT" ]; then
 		echo "Invalid normalisation. Choose either KR or VC_SQRT"
 		exit 1
 	    fi  
 	    ;;
-	o )
-	    # Output directory
-	    OUT_PATH=$OPTARG
+	o ) OUT_PATH=$OPTARG
 	    if [ ! -d $OUT_PATH ]; then
 		mkdir -p $OUT_PATH
 	    fi
@@ -166,8 +149,7 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
 	   echo "Option -$OPTARG requires an argument." >&2
 	   exit 1
 	   ;;
-	h )
-	    usage
+	h ) usage
 	    exit 1
 	    ;;
 	? )
@@ -198,8 +180,8 @@ INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
 
 # Env
-source ~/mambaforge/etc/profile.d/conda.sh
-source ~/mambaforge/etc/profile.d/mamba.sh
+#source ~/mambaforge/etc/profile.d/conda.sh
+#source ~/mambaforge/etc/profile.d/mamba.sh
 mamba activate lcs_pipeline
 
 # Define functions
@@ -358,13 +340,14 @@ do
 		    	
 	if [ "$Dump" == "Dump" ]; then
 	    echo "---------------------------------------------"
-	    echo "Dump interchromosomal contacts at resolution $DUMP_ReS"
+	    echo "Dump interchromosomal contacts at resolutions ${DUMP_RES[0]} and ${DUMP_RES[1]}"
 	    echo "---------------------------------------------"
 	    DUMP_OUT="${dir}/2_Dumps/"
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
 	    for res in ${DUMP_RES[@]}; do
+		echo "Dumping interchromosomal contacts at resolution $res"
 		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
 	    done
 	else
