@@ -377,6 +377,7 @@ python ${SCRIPT_DIR}/src/LCS_main.py \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
         -o $OUT_PATH
+
 if [ $? -ne 0 ]; then
 	echo "Error in LCS_main.py"
 	exit 1
