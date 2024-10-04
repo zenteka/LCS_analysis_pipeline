@@ -13,20 +13,24 @@ usage () {
 	  echo "| Run Loss of chromatin segregation analysis.                                                       |"
 	  echo "| This script is a wrapper around WGD LCS pipeline. It is meant to be run directly on               |"
 	  echo "| hic pipeline output. See test comparison.tsv for a sample file.                                   |"
+	  echo "| See USAGE for flag description                                                                    |"
 	  echo "| The main analysis is found in src/LCS_main.py.                                                    |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| The pipeline consists of 5 steps. Output of first 4 steps is REQUIRED to run the main analysis.   |"
+	  echo "| The pipeline consists of 5 steps.                						    |"
 	  echo "| The steps are:                                                                                    |"
 	  echo "| 1) Calder - Compute compartments and subcompartments. (Can be skipped if output exists)           |"
 	  echo "| 2) Dump - Dump interchromosomal contacts. (Can be skipped if output exists)                       |"
 	  echo "| 3) Calder Saddle - Compute compartment segregation scores (Can be skipped if output exists)       |"
 	  echo "| 4) Insulation - Compute insulation scores. (Can be skipped if output exists)                      |"
-	  echo "| 5) LCS analysis - Reuires output of all the above steps.                                          |"
+	  echo "| 5) LCS analysis - Requires output of all the above steps.                                         |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| Each module is described below.                                                                   |"
-	  echo "| IMPORTANT: To save time, if output exists, user is asked if they want to re-run modules 1-4!      |"
+	  echo "| IMPORTANT: To save time, if ouput exists, user is asked if they want to re-run modules 1-4!       |"
 	  echo "|---------------------------------------------------------------------------------------------------|"    
-	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA -o PLOTS_PATH -c COMPARISON_TABLE       # In/Out, Comparison |" 
+	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA directory with hic pipeline output. It serves as output      |"
+	  echo "|                      path for Calder, Dump, Saddle and Insulation scores.                         |"
+	  echo "|                      -c COMPARISON_TABLE [tsv, csv, xlsx] desired comparisons.                    |"
+	  echo "|                      -o OUTPUT directory for plots                                                |"
 	  echo "|                      -g GENOME -b BIN_SIZE -p THREADS                        # CALDER flags       |"
 	  echo "|                      -D DUMP_RES                                             # Dump flag          |"
 	  echo "|                      -r HIC_RES -b BIN_SIZE                                  # Calder Saddle flags|"
@@ -61,7 +65,7 @@ usage () {
 	  echo "|    -w Window size for insulation scores. Default 1000000.                                         |"
 	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR].                                        |"
 	  echo "|    -b BIN_SIZE - Resolution of Calder. Default 50000. Minimum is 10000. 			    |"
-	  echo "|    Fixed params for insulation analysis (Modify in the script):                                   |"
+	  echo "|    Fixed params for insulation analysis (Hardcoded in the script):                                |"
 	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| One can skip above steps if needed (comment out core functions) and run LCS analysis directly.    |"
@@ -80,13 +84,12 @@ usage () {
 	  echo "|                      -g Genome [hg19 or hg38].                                                    |"
 	  echo "|                      -r Hic resolution.                                                           |"
 	  echo "|                      -w Window size for insulation scores.                                        |"
-	  echo "|                      --intra_chr_res Intra chromosomal resolution.                                |"
-	  echo "|                      --INTER_CHR_RES Inter chromosomal resolution.                                |"
+	  echo "|                      --intra_chr_res Intra chromosomal resolution. [-d]                           |"
+	  echo "|                      --INTER_CHR_RES Inter chromosomal resolution. [-D]                           |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-
 }
 
-while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
+while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
     case ${opt} in 
 	b ) CALDER_RES=$OPTARG
 	    if [ $CALDER_RES -lt 10000 ]; then
