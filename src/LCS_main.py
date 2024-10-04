@@ -28,16 +28,9 @@ parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of c
 parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
 
 # %% Define variables
-
-if parser.parse_args().genome == "hg38":
-        CHROMSIZES = pd.read_csv("/cso/gscratch/Karol/LCS_analysis_beta/ref/hg38.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
-        print("Genome assembly: hg38")
-elif parser.parse_args().genome == "hg19":
-        CHROMSIZES = pd.read_csv("/cso/gscratch/Karol/LCS_analysis_beta/ref/hg19.main.chrom.sizes", sep="\t", header=None, names = ['chr', 'length'])
-        print("Genome assembly: hg19")
-else:
-        print("Genome assembly not recognized. Please provide a valid genome assembly (hg19 or hg38)")
-        raise ValueError
+print(f"{parser.parse_args().genome}")
+parser.parse_args().genome
+CHROMSIZES = pd.read_csv(parser.parse_args().genome, sep="\t", header=None, names = ['chr', 'length'])
         
 CHROMS_BY_SIZE = CHROMSIZES.sort_values('length', ascending=False).chr.tolist()
 LONG_CHROMS = CHROMS_BY_SIZE[:15]
@@ -368,7 +361,7 @@ def plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_change
 	sns.heatmap(pairwise_stats, 
 			cmap='RdBu_r',vmin=-4, vmax=4, 
 			center=0, linewidth=1, square=True,
-			cbar_kws=dict(shrink=0.5, 
+		        cbar_kws=dict(shrink=0.5, 
 						  aspect=10, 
 						  location='bottom',
 						  label="Gain vs. Loss of\ncompartment segregation\nfold-change (log2)"),
@@ -507,18 +500,17 @@ COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"3_CalderSaddleO
 BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}_boundaries.bed"
 INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}.bigWig"
 
-# Get comparison file
+# Get comparison file from commonly used formats
 if parser.parse_args().comparison.endswith('.tsv'):
-	LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=[0], sep="\t")
+	LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'], sep='\t')
 	print(LCS_COMPARISONS)
 elif parser.parse_args().comparison.endswith('.csv'):
-        LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'], sep=",")
+        LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'], sep=",")
 elif parser.parse_args().comparison.endswith('.xlsx'):
-        LCS_COMPARISONS = pd.read_excel(parser.parse_args().comparison, header=None, names = ['full_name1', 'full_name2'])
+        LCS_COMPARISONS = pd.read_excel(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'])
 else:
 	print("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
 	raise ValueError("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
-
 REPORT = {}
 OVERWRITE = True
 
@@ -656,9 +648,7 @@ for t in chain(LCS_COMPARISONS.itertuples()):
 		nonzero_shared_interactions_mindist = nonzero_shared_interactions[(nonzero_shared_interactions.distance <= MAX_DISTANCE)]
 		
 		fig, ax = plt.subplots(figsize=(5, 5))
-		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.sample1, sample2 = t.sample2)
-                
+		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.sample1, sample2 = t.sample2)                
 		fig.savefig(name)
-		plt.close(fig)
-                
+		plt.close(fig)                
 	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
