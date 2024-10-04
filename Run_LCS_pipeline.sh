@@ -87,7 +87,7 @@ usage () {
 }
 
 while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
-    case ${opt} in
+    case ${opt} in 
 	b ) CALDER_RES=$OPTARG
 	    if [ $CALDER_RES -lt 10000 ]; then
 		echo "Calder resolution must be at least 10000"
@@ -97,7 +97,6 @@ while getopts ":b:c:d:D:g:i:o:p:r:w:n:h" opt; do
 	c ) COMPARISON_TABLE=$OPTARG;;                              # Comparison table
        	d ) INTRA_CHR_RES=$OPTARG;;                                 # Intra chromosomal resolution
 	D ) INTER_CHR_RES=$OPTARG;; 				    # Inter chromosomal resolution
-	d )
 	g )
 	    # Genome
 	    if [ $OPTARG == "hg19" ]; then
@@ -310,21 +309,12 @@ do
 	fi
 		    	
 	if [ "$Dump" == "Dump" ]; then
-            
-	    echo "---------------------------------------------"
-	    echo "Dump interchromosomal contacts at resolutions ${DUMP_RES[0]} and ${DUMP_RES[1]}"
-	    echo "---------------------------------------------"
-            
 	    DUMP_OUT="${dir}/2_Dumps/"
 	    if [ ! -d $DUMP_OUT ]; then
 		mkdir -p $DUMP_OUT
 	    fi
 	    display_msg_run $Dump $sample $INTER_CHR_RES
 	    run_module_dump ${INTER_CHR_RES} ${COOL_PATH} "${DUMP_OUT}/binsize_${INTER_CHR_RES}.tsv"
-	    for res in ${DUMP_RES[@]}; do
-		echo "Dumping interchromosomal contacts at resolution $res"
-		run_module_dump $res ${COOL_PATH} "${DUMP_OUT}/binsize_${res}.tsv"
-	    done
 	else
 	    display_msg_skip "Dump" $sample
 	fi
@@ -377,7 +367,10 @@ python ${SCRIPT_DIR}/src/LCS_main.py \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
         -o $OUT_PATH
+<<<<<<< HEAD
 
+=======
+>>>>>>> 136b957da306c6525bdb9afe858e3a5a48e47808
 if [ $? -ne 0 ]; then
 	echo "Error in LCS_main.py"
 	exit 1
