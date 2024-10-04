@@ -156,15 +156,6 @@ INS_OUTPUT_FORMAT="bigwig"
 INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
 
-
-# Env
-#source ~/mambaforge/etc/profile.d/conda.sh
-#source ~/mambaforge/etc/profile.d/mamba.sh
-# TODO set correct env # Optmize that part
-source ~/mambaforge/etc/profile.d/conda.sh
-source ~/mambaforge/etc/profile.d/mamba.sh
-mamba activate lcs_pipeline
-
 ask_user () {
         echo "$1 output found."
 	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
@@ -310,8 +301,7 @@ do
 	if [ ! -d $CALDER_OUT ]; then
 	    mkdir -p $CALDER_OUT
 	fi
-
-	if [ $Calder == "Calder" ]; then
+	if [ "$Calder" == "Calder" ]; then
 	    display_msg_run $Calder $sample $CALDER_RES
 	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
 	else
@@ -363,8 +353,8 @@ do
 done
 
 echo "---------------------------------------------------------------------------------------------------"
-echo "---> Required modules have been run. Proceeding with main analysis <---                            |"
-echo "---> Runnning LCS_main.py on $INPUT_DIR <---                                                       |"
+echo " ------------------ All modules run successfully --------------------------------------------------"
+echo " ------------------ Run LCS_main.py main analysis -------------------------------------------------"
 echo "---------------------------------------------------------------------------------------------------"
 
 # Run LCS_main.py main analysis
@@ -373,24 +363,28 @@ python ${SCRIPT_DIR}/src/LCS_main.py \
         --comparison ${COMPARISON_TABLE} \
         --intra_chr_res ${INTRA_CHR_RES} \
 	--INTER_CHR_RES ${INTER_CHR_RES} \
-	-g $GENOME \
+	-g $(realpath $GEN_PATH) \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
         -o $OUT_PATH
-
-# Merge plots into one report for convenience 
-for res_dir in $OUT_PATH/*; do
-    if [[  "$res_dir" == "Interchromosomal_OE" ]]; then
-	# Skip
-	echo "Skipping $res_dir"
-    else
-	echo "Merging reports for $res_dir"
-	gs -o ${res_dir}/$(basename ${res_dir})_MergedReport.pdf \
-	   -dNOPAUSE -sDEVICE=pdfwrite -dAutoRotatePages=/None -sPAPERSIZE=a4 \
-	   -dPDFSETTINGS=/prepress \
-	   -c "<</Orientation 3>> setpagedevice" \
-	   -f ${res_dir}/*pdf
-    fi
-done
-# TODO - remove mamba 
-mamba deactivate
+if [ $? -ne 0 ]; then
+	echo "Error in LCS_main.py"
+	exit 1
+fi
+    
+# If on UNIX levrage ghostscript to merge reports
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    for res_dir in $OUT_PATH/*; do
+	if [[  "$res_dir" == "Interchromosomal_OE" ]]; then
+	    # Skip
+	    echo "Skipping $res_dir"
+	else
+	    echo "Merging reports for $res_dir"
+	    gs -o ${res_dir}/$(basename ${res_dir})_MergedReport.pdf \
+	       -dNOPAUSE -sDEVICE=pdfwrite -dAutoRotatePages=/None -sPAPERSIZE=a4 \
+	       -dPDFSETTINGS=/prepress \
+	       -c "<</Orientation 3>> setpagedevice" \
+	       -f ${res_dir}/*pdf
+	fi
+    done
+fi
