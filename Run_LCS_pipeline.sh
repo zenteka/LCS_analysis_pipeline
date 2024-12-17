@@ -108,6 +108,9 @@ while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
 	    elif [ $OPTARG == "hg38" ]; then
 		GEN_PATH=$SCRIPT_DIR/ref/hg38.main.chrom.sizes
 		GENOME="hg38"
+	    elif [ $OPTARG == "mm10" ]; then
+		GEN_PATH=$SCRIPT_DIR/ref/mm10.main.chrom.sizes
+		GENOME="mm10"
 	    else
 		echo "Invalid genome. Supported genomes are hg19 and hg38"
 		exit 1
@@ -149,9 +152,10 @@ while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
     esac
 done
 
-# Fixed parameters:
+# Hardcoded parameters:
 CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include - used for Calder
 EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
+
 ## SADDLE
 N_TILES=16
 ## INSULATION
@@ -375,6 +379,7 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+# Copy comparison table to results 
 cp ${COMPARISON_TABLE} ${OUT_PATH}/
 
 # If on UNIX try to levrage ghostscript to merge reports
