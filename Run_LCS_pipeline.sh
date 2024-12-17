@@ -374,9 +374,13 @@ if [ $? -ne 0 ]; then
 	echo "Error in LCS_main.py"
 	exit 1
 fi
-    
-# If on UNIX levrage ghostscript to merge reports
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+
+cp ${COMPARISON_TABLE} ${OUT_PATH}/
+
+# If on UNIX try to levrage ghostscript to merge reports
+if gs --version > /dev/null 2>&1; then
+    echo "Merging reports"
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     for res_dir in $OUT_PATH/*; do
 	if [[  "$res_dir" == "Interchromosomal_OE" ]]; then
 	    # Skip
@@ -390,4 +394,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 	       -f ${res_dir}/*pdf
 	fi
     done
+    fi
+else
+    echo "Warning: ghostscript not found. Cannot merge plots into one report!"		
 fi
