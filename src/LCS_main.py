@@ -2,6 +2,8 @@ import logging
 import os
 import argparse
 import pandas as pd
+from pandas.api.types import CategoricalDtype
+
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -27,9 +29,20 @@ parser.add_argument('-o','--output', type=str, help='Path to the output director
 parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of cscores', default=10000000)
 parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
 
+# Reqiete parsing into a function to be able to call it from other scripts
+def process_arguments():
+        parser = argparse.ArgumentParser(description='Run LCS analysis')
+        parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
+        parser.add_argument('-d','--intra_chr_res', type=int, help='Intra-chromosomal resolution', default=10000000)
+        parser.add_argument('-D','--INTER_CHR_RES', type=int, help='Inter-chromosomal resolution', default=1000000000)
+        parser.add_argument('-g','--genome', type=str, help='Genome assembly')
+        parser.add_argument('-i', '--INPUT_DIR', type=str, help='Input data directory.')
+        parser.add_argument('-o','--output', type=str, help='Path to the output directory')
+        parser.add_argument('-r','--HicResolution', type=int, help='Hi-C resolution of cscores', default=10000000)
+        parser.add_argument('-w','--INS_W_SIZE', type=int, help='Insulation window size from the main script', default=1000000)
+        return parser.parse_args()
+
 # %% Define variables
-print(f"{parser.parse_args().genome}")
-parser.parse_args().genome
 CHROMSIZES = pd.read_csv(parser.parse_args().genome, sep="\t", header=None, names = ['chr', 'length'])
         
 CHROMS_BY_SIZE = CHROMSIZES.sort_values('length', ascending=False).chr.tolist()
@@ -42,7 +55,6 @@ INSULATION_CHANGE_TO_COLOR = {
 		'gain': 'red',
 		'loss': 'blue'
 	}
-
 # %% Define functions
 def load_hic_interchromosomal_dump(spath, chrom_order = CHROMS_BY_SIZE):
 	s_ints = pd.read_csv(spath, sep="\t")
@@ -69,11 +81,14 @@ def get_shared_bins(s1_compartment_scores, s2_compartment_scores):
 					[['key', 'cscore2']]
 
 	# Getting only the bins having the same compartment in both samples
-	shared_bin_scores = s1_cscores.merge(s2_cscores, on = 'key')
+	shared_bin_scores = s1_cscores.merge(s2_cscores, on = 'key')	
 	# Getting the bin-wise difference of C-SCOREs between sample1 and sample2
 	shared_bin_scores['cscoreDiff'] = shared_bin_scores.cscore2 - shared_bin_scores.cscore1
 	# If the C-SCORE goes up we have a 'gain', otherwise we have a 'loss'
 	shared_bin_scores['cscoreChange'] = shared_bin_scores.cscoreDiff.map(lambda x: "gain" if x > 0 else "loss")
+	# changetype = [ 'gain', 'loss']
+	# shared_bin_scores['cscoreChange'] = pd.Categorical(shared_bin_scores.cscoreDiff.map(lambda x: changetype[0] if x > 0 else changetype[1]),
+							   # categories = changetype)
 	# We recover the compartment of that bin from the key
 	shared_bin_scores['compartment'] = shared_bin_scores.key.map(lambda x: x.split("_")[1])
 	return shared_bin_scores
@@ -81,13 +96,26 @@ def get_shared_bins(s1_compartment_scores, s2_compartment_scores):
 def get_compartment_stats(shared_bin_scores):
 	# For each compartment level, we compute the ratio of the number of 
 	# bins loosing segregation VS the number of bins gaining segregation
-	comp_stats = shared_bin_scores.groupby('compartment')['cscoreChange']\
-						.value_counts()\
-						.to_frame("n_bins")\
-						.reset_index()\
-						.pivot(index = 'compartment', columns = "cscoreChange", values = "n_bins")\
-						.assign(ratio = lambda x: x.loss / x.gain)\
-						.reset_index()
+	comp_stats = (
+		# count caterogical values
+		shared_bin_scores.groupby('compartment')['cscoreChange'].value_counts()
+		.to_frame("n_bins")
+		.reset_index()
+		.pivot(index='compartment', columns='cscoreChange', values='n_bins')  # Fill missing values with 
+		.assign(ratio=lambda x: x.loss / x.gain)
+		.reset_index()
+	)
+	# comp_stats = shared_bin_scores.groupby('compartment')['cscoreChange']\
+	# 					.value_counts()\
+	# 					.to_frame("n_bins")\
+	# 					.reset_index()\
+	# 					.pivot(index = 'compartment', columns = "cscoreChange", values = "n_bins", fill_value = 0)	
+						
+	# Ensure that both 'loss' and 'gain' columns are present
+	# if 'loss' not in comp_stats.columns:
+	# 	comp_stats['loss'] = 0
+	# if 'gain' not in comp_stats.columns:
+	# 	comp_stats['gain'] = 0
 	return comp_stats
 
 
@@ -258,10 +286,7 @@ def plot_inter_chromosomal_map_chrom_level_oe(sample_dump, sample_name):
         ax.plot([len(LONG_CHROMS), len(LONG_CHROMS)], [0, M.shape[0]], color='black', linewidth=2)
         ax.set_xlabel("Chromosome 2")
         ax.set_ylabel("Chromosome 1")
-        
         return fig, ax
-
-        
 
 # Plot function from LCS pipeline; WGD paper
 #def plot_inter_chromosomal_map_chrom_level_oe(ax, sample_dump):
@@ -323,7 +348,7 @@ def plot_compartment_scores(ax, comp_stats):
 				  x = "compartment", 
 				  y = "ratio", 
 				  order = COMPARTMENTS_8_LABELS,
-				  join=False,
+				  linestyle='none',
 				  color='black',
 				  scale = 1.5,
 				  markers="o",
@@ -335,7 +360,7 @@ def plot_compartment_scores(ax, comp_stats):
 	sns.despine(trim=True, ax=ax)
 
 
-def plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes):
+def plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes, s1, s2):
         
 	ab_aabb_values = pairwise_compartment_segregation_changes.assign(
 												h1 = lambda x: x.compartment1.map(lambda y: y.split(".")[0]),
@@ -460,23 +485,6 @@ def plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, 
 	ax.set_ylabel(f"{sample2} O/E (log2)")
 	sns.despine(ax = ax)
 
-def plot_percentage_trans_contacts(ax, all_phasing_stats_filter):
-	sns.barplot(data = all_phasing_stats_filter,
-				x = "chr1", y = "perc_TRANS", hue = "sample_name", 
-				order = CHROMSIZES.chr.tolist(),
-				hue_order=["RPE_TP53_Ctrl_mega", "RPE_TP53_48h0_1_mega", "RPE_TP53_48h0_2_mega"],
-				palette = {
-					"RPE_TP53_Ctrl_mega": "grey",
-					"RPE_TP53_48h0_1_mega": 'red',
-					"RPE_TP53_48h0_2_mega": 'salmon'
-				},
-				ax = ax)
-	ax.legend(bbox_to_anchor=(1, 1))
-	ax.set_xlabel("")
-	ax.set_ylabel("Percentage of trans-interactions")
-	ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', va='top', rotation_mode = 'anchor')
-	sns.despine(ax=ax)
-
 # %% Run main
 # Constans
 TOP_K=300
@@ -486,28 +494,29 @@ MAX_DISTANCE = 20000000
 OUTPUT_PATH = parser.parse_args().output                                                          # Save allthe main plots
 INTER_CHROMOSOMAL_OE_OUTPUT = f"{OUTPUT_PATH}"+"/Interchromosomal_OE"                             # Save the inter-chromosomal Observed/Expected plots for each sample
 os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
+
 # INPUT
 DATA_PATH = parser.parse_args().INPUT_DIR
 HIC_MAPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/aligned/inter_30.mcool"
-
 # Output of src/DUMP_COOL.py - inter-chromosomal interactions 
 INTER_CHROMOSOMAL_DUMPS_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"2_Dumps/binsize_{parser.parse_args().INTER_CHR_RES}.tsv"
-
 # Compartment scores - output src/CALDER_SADDLE.py - compartment segregation
 COMPARTMENT_SEGREGATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/"+f"3_CalderSaddleOutput_r{parser.parse_args().HicResolution}/compartment_scores.tsv"
-
 # Boundaries and insulation scores - output of run_module_insulation() function in ./Run_LCS_piepline.sh
 BOUNDARIES_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}_boundaries.bed"
 INSULATION_PATH = f"{DATA_PATH}"+"/{hic_sample}/4_InsulationOutput/"+f"insulation_scores_r50000_KR_w{parser.parse_args().INS_W_SIZE}.bigWig"
 
 # Get comparison file from commonly used formats
 if parser.parse_args().comparison.endswith('.tsv'):
-	LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'], sep='\t')
+	LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, sep='\t',
+                                      names=['sample1', 'sample2'])
 	print(LCS_COMPARISONS)
 elif parser.parse_args().comparison.endswith('.csv'):
-        LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'], sep=",")
+        LCS_COMPARISONS = pd.read_csv(parser.parse_args().comparison,
+                                      names=['sample1', 'sample2'])
 elif parser.parse_args().comparison.endswith('.xlsx'):
-        LCS_COMPARISONS = pd.read_excel(parser.parse_args().comparison, header=None, names = ['sample1', 'sample2'])
+        LCS_COMPARISONS = pd.read_excel(parser.parse_args().comparison,
+                                        names = ['sample1', 'sample2'])
 else:
 	print("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
 	raise ValueError("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
@@ -563,15 +572,16 @@ for t in chain(LCS_COMPARISONS.itertuples()):
 	print("------ Compartment scores ------")
 	
 	compartment_scores1 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.sample1), sep="\t")\
-								.assign(key = lambda x: x.chr + ":" + \
-														x.start.astype(str) + "-" + \
-														x.end.astype(str) + "_" + \
-														x.compartment)
+				.assign(key = lambda x: x.chr + ":" + \
+					x.start.astype(str) + "-" + \
+					x.end.astype(str) + "_" + \
+					x.compartment)
 	compartment_scores2 = pd.read_csv(COMPARTMENT_SEGREGATION_PATH.format(hic_sample=t.sample2), sep="\t")\
-								.assign(key = lambda x: x.chr + ":" + \
-														x.start.astype(str) + "-" + \
-														x.end.astype(str) + "_" + \
-														x.compartment)
+				.assign(key = lambda x: x.chr + ":" + \
+					x.start.astype(str) + "-" + \
+					x.end.astype(str) + "_" + \
+					x.compartment)
+	# print head
 	shared_bin_scores = get_shared_bins(compartment_scores1, compartment_scores2)
 	comp_stats = get_compartment_stats(shared_bin_scores)
 	
@@ -590,13 +600,14 @@ for t in chain(LCS_COMPARISONS.itertuples()):
 	
 	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_Compartment_PairedScores.pdf")
 	if OVERWRITE or (not os.path.exists(name)):
-		fig, ax = plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes)
+		fig, ax = plot_pairwise_compartment_scores(ax, pairwise_compartment_segregation_changes, t.sample1, t.sample2)
 		fig.savefig(name, bbox_inches='tight')
 		plt.close(fig)
 	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
 	
         
 	print("----- Boundary LCS -----")
+        # Boundary analysis. Input is insulation score.
 	
 	sample1_insulation = load_bigwig(INSULATION_PATH.format(hic_sample=t.sample1))
 	sample1_boundaries = load_boundaries(BOUNDARIES_PATH.format(hic_sample=t.sample1))
@@ -629,26 +640,25 @@ for t in chain(LCS_COMPARISONS.itertuples()):
 		plt.close(fig)
 	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
 	
-	print("----- Intra-chromosomal contacts ------")
-	
-	name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_IntraChromosomal_OE.pdf")
-	if OVERWRITE or (not os.path.exists(name)):
-		all_shared_interactions = get_all_shared_intra_interactions(HIC_MAPS_PATH.format(hic_sample=t.sample1), 
-									    HIC_MAPS_PATH.format(hic_sample=t.sample2), 
-                                                                            parser.parse_args().intra_chr_res,
-								['chrY', 'chrM'])
+	print("-----Skipping Intra-chromosomal contacts ------")	
+	# name = os.path.join(comparison_path, f"{t.sample1}_VS_{t.sample2}_IntraChromosomal_OE.pdf")
+	# if OVERWRITE or (not os.path.exists(name)):
+	# 	all_shared_interactions = get_all_shared_intra_interactions(HIC_MAPS_PATH.format(hic_sample=t.sample1), 
+	# 								    HIC_MAPS_PATH.format(hic_sample=t.sample2),
+        #                                                                     parser.parse_args().intra_chr_res,
+	# 							['chrY', 'chrM'])
 		
-		nonzero_shared_interactions = all_shared_interactions[(all_shared_interactions.control > 0) & (all_shared_interactions.wgd > 0)].copy()
-		nonzero_shared_interactions['fc'] = nonzero_shared_interactions.wgd / nonzero_shared_interactions.control
-		nonzero_shared_interactions['log2_control'] = nonzero_shared_interactions['control'].map(np.log2)
-		nonzero_shared_interactions['log2_wgd'] = nonzero_shared_interactions['wgd'].map(np.log2)
-		nonzero_shared_interactions['log2_fc'] = nonzero_shared_interactions.fc.map(np.log2)
-		nonzero_shared_interactions['fc_of_logs'] = nonzero_shared_interactions.log2_wgd / nonzero_shared_interactions.log2_control
-		nonzero_shared_interactions['change_type'] = nonzero_shared_interactions.apply(lambda x: "loss of signal" if abs(x.log2_control) > abs(x.log2_wgd) else "gain of signal", axis=1)
-		nonzero_shared_interactions_mindist = nonzero_shared_interactions[(nonzero_shared_interactions.distance <= MAX_DISTANCE)]
+	# 	nonzero_shared_interactions = all_shared_interactions[(all_shared_interactions.control > 0) & (all_shared_interactions.wgd > 0)].copy()
+	# 	nonzero_shared_interactions['fc'] = nonzero_shared_interactions.wgd / nonzero_shared_interactions.control
+	# 	nonzero_shared_interactions['log2_control'] = nonzero_shared_interactions['control'].map(np.log2)
+	# 	nonzero_shared_interactions['log2_wgd'] = nonzero_shared_interactions['wgd'].map(np.log2)
+	# 	nonzero_shared_interactions['log2_fc'] = nonzero_shared_interactions.fc.map(np.log2)
+	# 	nonzero_shared_interactions['fc_of_logs'] = nonzero_shared_interactions.log2_wgd / nonzero_shared_interactions.log2_control
+	# 	nonzero_shared_interactions['change_type'] = nonzero_shared_interactions.apply(lambda x: "loss of signal" if abs(x.log2_control) > abs(x.log2_wgd) else "gain of signal", axis=1)
+	# 	nonzero_shared_interactions_mindist = nonzero_shared_interactions[(nonzero_shared_interactions.distance <= MAX_DISTANCE)]
 		
-		fig, ax = plt.subplots(figsize=(5, 5))
-		plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.sample1, sample2 = t.sample2)                
-		fig.savefig(name)
-		plt.close(fig)                
-	REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
+	# 	fig, ax = plt.subplots(figsize=(5, 5))
+	# 	plot_intra_chromosomal_OE_contacts(ax, nonzero_shared_interactions_mindist, sample1 = t.sample1, sample2 = t.sample2)                
+	# 	fig.savefig(name)
+	# 	plt.close(fig)                
+	# REPORT[f"{t.sample1} VS {t.sample2}"].append(name)
