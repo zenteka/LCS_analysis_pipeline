@@ -262,38 +262,38 @@ def main():
 			all_chrom_compartment_scores.append(chrom_compartment_scores)
 
 
-			fig = plt.figure()
-			sns.boxplot(data=chrom_compartment_scores, x = 'compartment', order = reversed(COMPARTMENTS_8_LABELS), 
-						y='oe_sim_corr', palette = 'bwr')
-			plt.xlabel("Compartment")
-			plt.ylabel("Segregation score")
-			plt.title(chrom)
-			sns.despine()
-			fig.savefig(os.path.join(output_path, "plots", f"{chrom}_compartments_segregation_distribution.pdf"))
-			plt.close(fig)
+			# fig = plt.figure()
+			# sns.boxplot(data=chrom_compartment_scores, x='compartment', order = reversed(COMPARTMENTS_8_LABELS), 
+			# 			y='oe_sim_corr')
+			# plt.xlabel("Compartment")
+			# plt.ylabel("Segregation score")
+			# plt.title(chrom)
+			# sns.despine()
+			# fig.savefig(os.path.join(output_path, "plots", f"{chrom}_compartments_segregation_distribution.pdf"))
+			# plt.close(fig)
 
-			fig = plt.figure()
-			sns.boxplot(data=chrom_compartment_scores, x = 'tile', 
-						y='oe_sim_corr', palette = 'bwr')
-			plt.xlabel("Compartment percentile")
-			plt.ylabel("Segregation score")
-			plt.title(chrom)
-			sns.despine()
-			fig.savefig(os.path.join(output_path, "plots", f"{chrom}_{n_tiles}_tiles_segregation_distribution.pdf"))
-			plt.close(fig)
+			# fig = plt.figure()
+			# sns.boxplot(data=chrom_compartment_scores, x = 'tile', 
+			# 			y='oe_sim_corr', palette = 'bwr')
+			# plt.xlabel("Compartment percentile")
+			# plt.ylabel("Segregation score")
+			# plt.title(chrom)
+			# sns.despine()
+			# fig.savefig(os.path.join(output_path, "plots", f"{chrom}_{n_tiles}_tiles_segregation_distribution.pdf"))
+			# plt.close(fig)
 
-			fig = plt.figure()
-			sns.scatterplot(data = chrom_compartment_scores, 
-							x="domain_rank", y = "oe_sim_corr", hue = "compartment",
-							hue_order=reversed(COMPARTMENTS_8_LABELS), palette = "bwr",
-							rasterized=False)
-			plt.xlabel("Compartment rank")
-			plt.ylabel("Segregation score")
-			plt.title(chrom)
-			sns.despine()
-			plt.legend(bbox_to_anchor=(1, 1))
-			fig.savefig(os.path.join(output_path, "plots", f"{chrom}_domains_segregation_distribution.pdf"))
-			plt.close(fig)
+			# fig = plt.figure()
+			# sns.scatterplot(data = chrom_compartment_scores, 
+			# 				x="domain_rank", y = "oe_sim_corr", hue = "compartment",
+			# 				hue_order=reversed(COMPARTMENTS_8_LABELS), palette = "bwr",
+			# 				rasterized=False)
+			# plt.xlabel("Compartment rank")
+			# plt.ylabel("Segregation score")
+			# plt.title(chrom)
+			# sns.despine()
+			# plt.legend(bbox_to_anchor=(1, 1))
+			# fig.savefig(os.path.join(output_path, "plots", f"{chrom}_domains_segregation_distribution.pdf"))
+			# plt.close(fig)
 
 			# Tile-level analysis
 			# -------------------
@@ -380,13 +380,13 @@ def main():
 			plt.close(fig)
 
 
-			fig = plt.figure()
-			sns.boxplot(data = chrom_comps, x='compartment', y = 'domain_rank', palette = 'bwr', order = reversed(COMPARTMENTS_8_LABELS))
-			plt.xlabel("Compartment")
-			plt.ylabel("Compartment rank")
-			sns.despine()
-			fig.savefig(os.path.join(output_path, "plots", f"{chrom}_compartments_rank_distribution.pdf"))
-			plt.close(fig)
+			# fig = plt.figure()
+			# sns.boxplot(data = chrom_comps, x='compartment', y = 'domain_rank', order = reversed(COMPARTMENTS_8_LABELS))
+			# plt.xlabel("Compartment")
+			# plt.ylabel("Compartment rank")
+			# sns.despine()
+			# fig.savefig(os.path.join(output_path, "plots", f"{chrom}_compartments_rank_distribution.pdf"))
+			# plt.close(fig)
 
 			# Compartment domain analysis
 			# ---------------------------
@@ -536,8 +536,6 @@ def main():
 				.set_titles(row_template="{row_name}", col_template="{col_name}",size = 20 )
 		g.savefig(os.path.join(output_path, "plots", "genomewide_compartment_segregation_distribution_by_chrom.pdf"))
 		plt.close(g.fig)
-
-
 	logger.info("Computing genome-wide saddle plots")
 	genomewide_comp_level = all_comp_level.groupby(['compartment1', 'compartment2'])['avg_oe']\
 											.mean().to_frame("avg_oe").reset_index()
@@ -560,18 +558,18 @@ def main():
 	genomewide_tile_level = all_tile_level.groupby(['tile1', 'tile2'])['avg_oe']\
 											.mean().to_frame("avg_oe").reset_index()
 
-	fig = plt.figure()
-	H = genomewide_tile_level.pivot(index = 'tile1', columns = 'tile2', values = "avg_oe")
-	H.loc[:, :] = np.triu(H.values) + np.triu(H.values, k=1).T
-	H = H.sort_index(ascending=False, axis=0).sort_index(ascending=True, axis=1)
-	sns.heatmap(H, cmap='bwr', vmin=0, vmax=2, square=True, linewidth=1, 
-				cbar_kws=dict(label = "Avg. O/E counts", aspect=5, shrink=.5))
-	plt.xlabel("Compartment percentile")
-	plt.ylabel("Compartment percentile")
-	plt.xticks(rotation=0)
-	plt.yticks(rotation=0)
-	fig.savefig(os.path.join(output_path, "plots", f"genomewide_{n_tiles}_tiles_saddle.pdf"))
-	plt.close(fig)
+	# fig = plt.figure()
+	# H = genomewide_tile_level.pivot(index = 'tile1', columns = 'tile2', values = "avg_oe")
+	# H.loc[:, :] = np.triu(H.values) + np.triu(H.values, k=1).T
+	# H = H.sort_index(ascending=False, axis=0).sort_index(ascending=True, axis=1)
+	# sns.heatmap(H, cmap='bwr', vmin=0, vmax=2, square=True, linewidth=1, 
+	# 			cbar_kws=dict(label = "Avg. O/E counts", aspect=5, shrink=.5))
+	# plt.xlabel("Compartment percentile")
+	# plt.ylabel("Compartment percentile")
+	# plt.xticks(rotation=0)
+	# plt.yticks(rotation=0)
+	# fig.savefig(os.path.join(output_path, "plots", f"genomewide_{n_tiles}_tiles_saddle.pdf"))
+	# plt.close(fig)
 
 
 	# Aggregating compartments at 2-level hierarchy (A/B)
@@ -640,16 +638,5 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
-
-
-
-
-
-
-
-
-
-
 
 
