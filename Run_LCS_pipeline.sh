@@ -3,19 +3,19 @@
 # AUTHOR: Karol Piera and Luca Nanni
 # Email: karol.piera@unil.ch
 
-SCRIPT_DIR=$(dirname $0)
-
 # LCS is meant to be run on hic pipeline output. Desired comparison should be provided in a tsv, csv or xlsx format.
 # LCS pipeline is a module-based analysis. Ouptut of module 1 to 4 is required to run the main LCS analysis.
+
+# TODO:
+## Flip names for plotting
+
+SCRIPT_DIR=$(dirname $0)
 
 usage () {
     	  echo "|---------------------------------------------------------------------------------------------------|"  
 	  echo "| Run Loss of chromatin segregation analysis.                                                       |"
-	  echo "| This script is a wrapper around WGD LCS pipeline. It is meant to be run directly on               |"
-	  echo "| hic pipeline output. See test comparison.tsv for a sample file.                                   |"
-	  echo "| See USAGE for flag description                                                                    |"
-	  echo "| The main analysis is found in src/LCS_main.py.                                                    |"
-	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| Author: Karol Piera and Luca Nanni                                                                |"
+	  echo "| This script runs the full LCS pipeline including. It consists of 5 steps.                         |"
 	  echo "| The pipeline consists of 5 steps.                						    |"
 	  echo "| The steps are:                                                                                    |"
 	  echo "| 1) Calder - Compute compartments and subcompartments. (Can be skipped if output exists)           |"
@@ -24,15 +24,11 @@ usage () {
 	  echo "| 4) Insulation - Compute insulation scores. (Can be skipped if output exists)                      |"
 	  echo "| 5) LCS analysis - Requires output of all the above steps.                                         |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| Each module is described below.                                                                   |"
-	  echo "| IMPORTANT: To save time, if ouput exists, user is asked if they want to re-run modules 1-4!       |"
-	  echo "|---------------------------------------------------------------------------------------------------|"    
 	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA directory with hic pipeline output. It serves as output      |"
 	  echo "|                      path for Calder, Dump, Saddle and Insulation scores.                         |"
 	  echo "|                      -c COMPARISON_TABLE [tsv, csv, xlsx] desired comparisons.                    |"
 	  echo "|                      -o OUTPUT directory for plots                                                |"
 	  echo "|                      -g GENOME -b BIN_SIZE -p THREADS                        # CALDER flags       |"
-	  echo "|                      -D DUMP_RES                                             # Dump flag          |"
 	  echo "|                      -r HIC_RES -b BIN_SIZE                                  # Calder Saddle flags|"
 	  echo "|                      -w INS_W_SIZE -n INS_NORMALISATION                      # Insulation flags   |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
@@ -71,10 +67,10 @@ usage () {
 	  echo "| One can skip above steps if needed (comment out core functions) and run LCS analysis directly.    |"
 	  echo "| Sample dir structure required for LCS analysis:                                                   |"
 	  echo "|                                                                                                   |"
-	  echo "|            ./{hic_sample}/1_CalderOutput_50000 						    |"
-	  echo "|                           2_Dumps                                                                 |"
+	  echo "|            ./{hic_sample}/1_subcomp_50000 						    |"
+	  echo "|                           2_trans                                                                 |"
 	  echo "|                           3_CalderSaddleOutput_r1000000 				     	    |"
-	  echo "|                           4_InsulationOutput 						    	    |"	
+	  echo "|                           4_insulation 						    	    |"	
 	  echo "|                           aligned (hic_pipeline output) 					    |"
 	  echo "|                                        						            |"
 	  echo "|------------------------------ LCS MAIN ANALYSIS --------------------------------------------------|"
@@ -85,21 +81,12 @@ usage () {
 	  echo "|                      -r Hic resolution.                                                           |"
 	  echo "|                      -w Window size for insulation scores.                                        |"
 	  echo "|                      --intra_chr_res Intra chromosomal resolution. [-d]                           |"
-	  echo "|                      --INTER_CHR_RES Inter chromosomal resolution. [-D]                           |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 }
 
-while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
+while getopts ":c:g:i:o:p:h" opt; do
     case ${opt} in 
-	b ) CALDER_RES=$OPTARG
-	    if [ $CALDER_RES -lt 10000 ]; then
-		echo "Calder resolution must be at least 10000"
-		exit 1
-	    fi
-	    ;;
 	c ) COMPARISON_TABLE=$OPTARG;;                              # Comparison table
-       	d ) INTRA_CHR_RES=$OPTARG;;                                 # Intra chromosomal resolution
-	D ) INTER_CHR_RES=$OPTARG;; 				    # Inter chromosomal resolution
 	g )
 	    # Genome
 	    if [ $OPTARG == "hg19" ]; then
@@ -116,23 +103,13 @@ while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
 		exit 1
 	    fi
 	    ;;
-	i )
-	    # INPUT. Results directory
-	    INPUT_DIR=$OPTARG
+	i ) INPUT_DIR=$OPTARG
 	    if [ ! -d $INPUT_DIR ]; then
 		echo "Input directory does not exist"
 		exit 1
 	    fi
 	    ;;
 	p ) NPROC=$OPTARG;;
-	r ) HIC_RES=$OPTARG;;
-	w ) INS_W_SIZE=$OPTARG;;
-	n)  INS_NORMALISATION=$OPTARG
-	    if [ $INS_NORMALISATION != "KR" ] && [ $INS_NORMALISATION != "VC_SQRT" ]; then
-		echo "Invalid normalisation. Choose either KR or VC_SQRT"
-		exit 1
-	    fi  
-	    ;;
 	o ) OUT_PATH=$OPTARG
 	    if [ ! -d $OUT_PATH ]; then
 		mkdir -p $OUT_PATH
@@ -143,25 +120,44 @@ while getopts ":b:c:d:D:g:i:n:o:p:r:w:h" opt; do
 	   exit 1
 	   ;;
 	h ) usage
-	    exit 1
-	    ;;
+	    exit 1 ;;
 	? )
  	   echo "Invalid option passed: $OPTARG" 1>&2
-	   exit 1
-	   ;;
+	   exit 1 ;;
     esac
 done
 
-# Hardcoded parameters:
-CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes | grep -v chrY | sort | uniq | tr '\n' , ) # Chromosomes to include - used for Calder
-EXCLUDED_CHROMOSOMES="chrY,chrM,chrMT,Y,M,MT"                                                     # Chromosomes to exclude in DUMP and SADDLE
+# Hardcoded parameters for the input-generating modules and LCS analysis.
+CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes |\
+	     grep -v chrY |\
+	     sort | uniq |\
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to  in malformed hic files.
 
-## SADDLE
+CHROMS=${CHROMS%,}
+echo "Using chromosomes: $CHROMS"
+
+EXCLUDED_CHROMOSOMES=$(cat $SCRIPT_DIR/ref/chroms_to_exclude.txt )                                                      
+EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^chr//' )
+EXCLUDED_CHROMOSOMES=${EXCLUDED_CHROMOSOMES%,}
+echo "Excluding chromosomes: $EXCLUDED_CHROMOSOMES"
+
+CALDER_RES=50000
+HIC_RES=1000000
+
+# TRANS CONTACTS ANALYSIS
+INTER_CHR_RES=1000000000
+
+# Segregation analysis 
 N_TILES=16
+
 ## INSULATION
 INS_OUTPUT_FORMAT="bigwig"
+INS_NORMALISATION='KR'
 INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
+INS_W_SIZE=1000000
+
+INTRA_CHR_RES=1000000
 
 ask_user () {
         echo "$1 output found."
@@ -175,57 +171,48 @@ ask_user () {
 	fi
 }
 
-# Since Calder, Dump, Saddle and Insulation are essential for the LCS analysis but costly on time,
-# we let user to decide if they want to re-run them or skip if the output is already present.
-if [ $(find $INPUT_DIR -name *30.hic | wc -l) -eq 0 ]; then
-	echo "No hic files found in $INPUT_DIR"
+# Screen samples for required input. Collect for further processing.
+SAMPLES=()
+RUN_CALDER=()
+RUN_DUMP=()
+RUN_SADDLE=()
+RUN_INSULATION=()
+  
+while IFS= read -r line; do
+    # check if sample exists in input dir
+    if [ ! -f "$INPUT_DIR/$line/aligned/inter_30.hic" ]; then
+	echo "Error: Sample $line does not appear to have hic file!"
+	echo "Please check your input directory and comparison table!"
 	exit 1
-fi
-
-
-if [ $(find $INPUT_DIR -name *sub*.bed | wc -l) -gt 0 ]; then
-    ask_user "Calder"
-    if [ $? -eq 0 ]; then
-	Calder="Calder"
     else
-	Calder=""
+	SAMPLES+=("$line")
     fi
-else
-    Calder="Calder"
-fi
+done < <(cut -f1-2 $COMPARISON_TABLE | tr '\n' '\n' | tr '\t' '\n' | sort | uniq)
 
-if [ $(find $INPUT_DIR -type f -name binsize_${INTER_CHR_RES}.tsv | wc -l) -gt 0 ]; then
-    ask_user "Dump"
-    if [ $? -eq 0 ]; then
-	Dump="Dump"
-    else
-	Dump=""
+# Step 2: Check for missing required inputs
+for sample in "${SAMPLES[@]}"; do
+    echo "Checking sample $sample for missing inputs..."
+
+    # Check if Calder output is missing
+    if ! find -L "$INPUT_DIR" -type d -path "*/$sample/1_subcomp_${CALDER_RES}/sub_compartments" | grep -q .; then
+        RUN_CALDER+=("$sample")
     fi
-else
-    Dump="Dump"
-fi
 
-if [ $(find $INPUT_DIR -type d -name 3_CalderSaddleOutput* | wc -l) -gt 0 ]; then
-    ask_user "Saddle and Insulation"
-    if [ $? -eq 0 ]; then
-	Saddle="Saddle"
-    else
-	Saddle=""
+    # Check if binsize dump is missing
+    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/*binsize_${INTER_CHR_RES}.tsv" | grep -q .; then
+        RUN_DUMP+=("$sample")
     fi
-else
-    Saddle="Saddle"
-fi
 
-if [ $(find $INPUT_DIR -type d -name 4_InsulationOutput | wc -l) -gt 0 ]; then
-	ask_user "Insulation"
-	if [ $? -eq 0 ]; then
-	    Insulation="Insulation"
-	else
-	    Insulation="Stop"
-	fi
-else
-    Insulation="Insulation"
-fi
+    # Check if Saddle output is missing
+    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/3_saddle/compartment_scores.tsv" | grep -q .; then
+        RUN_SADDLE+=("$sample")
+    fi
+
+    # Check if Insulation output is missing
+    if ! find -L "$INPUT_DIR" -type d -path "*/$sample/4_insulation" | grep -q .; then
+        RUN_INSULATION+=("$sample")
+    fi
+done
 
 run_module_calder() {
     calder --input $1 \
@@ -235,6 +222,20 @@ run_module_calder() {
 	   --genome $GENOME \
 	   --outpath $4 \
 	   --adaptive
+    # Make bed bak and call subcomps.bak
+    cp "$4/sub_compartments/all_sub_compartments.bed" "$4/sub_compartments/all_sub_compartments.bed.bak"
+    # Adjust 1-indexed fields: columns 2 and 7 (convert to 0-based for BED format); See comments section.
+    awk '{print $1"\t"($2-1)"\t"$3"\t"$4"\t"$5"\t"$6"\t"($7-1)"\t"$8"\t"$9}' \
+	"$4/sub_compartments/all_sub_compartments.bed.bak" > "$4/sub_compartments/tmp.bed"
+    sort -k1,1 -k2,2n "$4/sub_compartments/tmp.bed" > "$4/sub_compartments/all_sub_compartments.bed"
+    rm "$4/sub_compartments/tmp.bed"
+    # check if the bed file is valid (has 9 columns)
+    # awk 'NF!=9 {print "Error: Invalid bed file. Expected 9 columns, found "NF" columns in line: "$0; exit 1}' \
+    # 	"$4/sub_compartments/all_sub_compartments.bed"
+    # if [ $? -ne 0 ]; then
+    # 	echo "Error: Invalid bed file. Please check Calder output."
+    # 	exit 1
+    # fi
 }
 
 run_module_dump() {
@@ -245,7 +246,7 @@ run_module_dump() {
 }
 
 run_module_saddle() {
-    python src/CALDER_SADDLE.py ${1} ${2} ${3} \
+	python src/CALDER_SADDLE_FAST.py ${1} ${2} ${3} \
 	   --hic_resolution ${HIC_RES} \
 	   --compartments_resolution ${CALDER_RES} \
 	   --n_tiles ${N_TILES} \
@@ -261,7 +262,7 @@ run_module_insulation() {
 	 --offset 0 \
 	 --geom-mean \
 	 --trim-mean ${INS_TRIM_MEAN}
-    for f in `find ${2} -name "$(basename ${3})_*.bigwig"`
+    for f in `find -L ${2} -name "$(basename ${3})_*.bigwig"`
     do
 	mv ${f} ${3}.bigWig
     done
@@ -288,84 +289,103 @@ display_msg_run () {
 
 display_msg_skip () {
 	echo "--------------------------------------------------------------------------------"
-	echo "Skipping $1 for $2"
+	echo "Skipping module $1"
 	echo "--------------------------------------------------------------------------------"
 }
- 
-# Run main modules: Calder, Dump, Saddle, Insulation
-for dir in $INPUT_DIR/*; 
-do
-    if [ ! -d $dir ]; then
-	continue
-    else
-	# Get files
-	sample=$(basename $dir)
-	HIC_PATH=$( realpath $(find $dir -name "*30.hic") ) # Get hic file
-	COOL_PATH=$( realpath $(find $dir -name "*30.mcool") ) # Get cool file
-	
-	CALDER_OUT=${dir}/1_CalderOutput_${CALDER_RES}
-	
-	if [ ! -d $CALDER_OUT ]; then
-	    mkdir -p $CALDER_OUT
-	fi
-	if [ "$Calder" == "Calder" ]; then
-	    display_msg_run $Calder $sample $CALDER_RES
-	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
-	else
-	    display_msg_skip "Calder" $sample 
-	fi
-		    	
-	if [ "$Dump" == "Dump" ]; then
-	    DUMP_OUT="${dir}/2_Dumps/"
-	    if [ ! -d $DUMP_OUT ]; then
-		mkdir -p $DUMP_OUT
-	    fi
-	    display_msg_run $Dump $sample $INTER_CHR_RES
-	    run_module_dump ${INTER_CHR_RES} ${COOL_PATH} "${DUMP_OUT}/binsize_${INTER_CHR_RES}.tsv"
-	else
-	    display_msg_skip "Dump" $sample
-	fi
-	
-	if [ -f ${CALDER_OUT}/sub_compartments/all_sub_compartments.bed ]; then 
-	    # Double-check if compartment file exsists (neccessary for Calder Saddle)
-	    COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
-	    SADDLE_OUT=${dir}/3_CalderSaddleOutput_r${HIC_RES}
-	    
-	    if [ "$Saddle" == "Saddle" ]; then
-		if [ ! -d $SADDLE_OUT ]; then
-		    mkdir -p $SADDLE_OUT
-		fi
-		display_msg_run $Saddle $sample $HIC_RES
- 		run_module_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT} 
-	    else
-		display_msg_skip "Saddle" $sample
-	    fi
-	else
-	    echo "No compartment file found for $sample sample. Skipping Saddle"
-	fi
-
-	if [ $Insulation == "Insulation" ]; then
-	    INS_PATH=${dir}/4_InsulationOutput
-	
-	    if [ ! -d $INS_PATH ]; then
-		mkdir -p $INS_PATH
-	    fi
-	    OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
-	    display_msg_run $Insulation $sample $CALDER_RES
-	    run_module_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
-	else
-	    display_msg_skip "Insulation" $sample
-	fi    
-    fi
-done
+display_msg_present () {
+	echo "--------------------------------------------------------------------------------"
+	echo "$1 output already present for all samples. Skipping $1 module"
+	echo "--------------------------------------------------------------------------------"
+}
 
 echo "---------------------------------------------------------------------------------------------------"
-echo " ------------------ All modules run successfully --------------------------------------------------"
-echo " ------------------ Run LCS_main.py main analysis -------------------------------------------------"
+echo " ------------------ Running modules 1-4: Calder, Dump, Saddle, Insulation ---------------------------"
+echo "---------------------------------------------------------------------------------------------------"
+
+# check every RUN_ array and in case it is not empty ask user whether to run modules for given samples.
+if [ ${#RUN_CALDER[@]} -gt 0 ]; then
+    echo "Detected missing subcompartment calls for samples: ${RUN_CALDER[@]}"
+    ask_user "Calder"
+    if [ $? -eq 0 ]; then
+	for sample in "${RUN_CALDER[@]}"; do
+	    display_msg_run "Calder" $sample $CALDER_RES
+	    HIC_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.hic") ) # Get hic file
+	    CALDER_OUT=${INPUT_DIR}/${sample}/1_subcomp_${CALDER_RES}
+	    if [ ! -d $CALDER_OUT ]; then mkdir -p $CALDER_OUT; fi
+	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
+	done
+    else
+	display_msg_skip "Calder"
+    fi
+else
+    display_msg_present "Calder"
+fi
+
+if [ ${#RUN_DUMP[@]} -gt 0 ]; then
+	echo "Detected missing inter-chromosomal dumps for samples: ${RUN_DUMP[@]}"
+	ask_user "Dump"
+	if [ $? -eq 0 ]; then
+	    for sample in "${RUN_DUMP[@]}"; do
+		display_msg_run "Dump" $sample $INTER_CHR_RES
+		COOL_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.mcool") ) # Get cool file
+		DUMP_OUT="${INPUT_DIR}/${sample}/2_trans/"
+		if [ ! -d $DUMP_OUT ]; then mkdir -p $DUMP_OUT; fi
+		run_module_dump ${INTER_CHR_RES} ${COOL_PATH} "${DUMP_OUT}/binsize_${INTER_CHR_RES}.tsv"
+	    done
+	else
+	    display_msg_skip "Dump"
+	fi
+else
+    display_msg_present "Dump"
+fi
+
+if [ ${#RUN_SADDLE[@]} -gt 0 ]; then
+	echo "Detected missing Calder Saddle output for samples: ${RUN_SADDLE[@]}"
+	ask_user "Saddle"
+	if [ $? -eq 0 ]; then
+	for sample in "${RUN_SADDLE[@]}"; do
+	    display_msg_run "Saddle" $sample $HIC_RES
+	    COOL_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.mcool") ) # Get cool file
+	    CALDER_OUT=${INPUT_DIR}/${sample}/1_subcomp_${CALDER_RES}
+	    COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
+	    SADDLE_OUT=${INPUT_DIR}/${sample}/3_CalderSaddleOutput_r${HIC_RES}
+	    if [ ! -d $SADDLE_OUT ]; then mkdir -p $SADDLE_OUT; fi
+	    run_module_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT}
+	done
+	else
+	    display_msg_skip "Saddle"
+	fi
+else
+    display_msg_present "Saddle"
+fi
+
+if [ ${#RUN_INSULATION[@]} -gt 0 ]; then
+	echo "Detected missing insulation scores for samples: ${RUN_INSULATION[@]}"
+	ask_user "Insulation"
+	if [ $? -eq 0 ]; then
+	for sample in "${RUN_INSULATION[@]}"; do
+	    display_msg_run "Insulation" $sample $CALDER_RES
+	    HIC_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.hic") ) # Get hic file
+	    INS_PATH=${INPUT_DIR}/${sample}/4_insulation
+	    if [ ! -d $INS_PATH ]; then mkdir -p $INS_PATH; fi
+	    OUT_F=${INS_PATH}/insulation_scores_r${CALDER_RES}_${INS_NORMALISATION}_w${INS_W_SIZE}
+	    run_module_insulation ${HIC_PATH} ${INS_PATH} ${OUT_F}
+	done
+	else
+	    display_msg_skip "Insulation"
+	fi
+else
+    display_msg_present "Insulation"
+fi
+
+echo "---------------------------------------------------------------------------------------------------"
+echo " ------------------ All required input for LCS analysis is present --------------------------------"
+echo "---------------------------------------------------------------------------------------------------"
+echo " ------------------ Run Genome-wide LCS analysis -------------------------------------------------"
 echo "---------------------------------------------------------------------------------------------------"
 
 # Run LCS_main.py main analysis
-python ${SCRIPT_DIR}/src/LCS_main.py \
+python ${SCRIPT_DIR}/src/LCS_main_fix.py \
         --INPUT_DIR ${INPUT_DIR} \
         --comparison ${COMPARISON_TABLE} \
         --intra_chr_res ${INTRA_CHR_RES} \
@@ -374,13 +394,21 @@ python ${SCRIPT_DIR}/src/LCS_main.py \
 	-r $HIC_RES \
 	-w $INS_W_SIZE \
         -o $OUT_PATH
-if [ $? -ne 0 ]; then
-	echo "Error in LCS_main.py"
-	exit 1
-fi
 
-# Copy comparison table to results 
+echo "---------------------------------------------------------------------------------------------------"
+echo " ------------------ Run Chromosome-level compartment segregation analysis ---------------------------"
+echo "---------------------------------------------------------------------------------------------------"
+
+CHROM_LCS="${OUT_PATH}/Chrom_LCS"
+if [ ! -d $CHROM_LCS ]; then mkdir -p $CHROM_LCS; fi
+python ${SCRIPT_DIR}/src/LCS_subcomp_chrom.py \
+		--data ${INPUT_DIR} \
+		--comparisons ${COMPARISON_TABLE} \
+		--output ${CHROM_LCS}
+
+# Save comparison with results and archive
 cp ${COMPARISON_TABLE} ${OUT_PATH}/
+cp ${COMPARISON_TABLE} /mnt/data2/karol/DevAll_shared/With_Konstantina/comparisons/done/
 
 # If on UNIX try to levrage ghostscript to merge reports
 if gs --version > /dev/null 2>&1; then
@@ -403,3 +431,4 @@ if gs --version > /dev/null 2>&1; then
 else
     echo "Warning: ghostscript not found. Cannot merge plots into one report!"		
 fi
+
