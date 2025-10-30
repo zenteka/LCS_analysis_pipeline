@@ -8,7 +8,8 @@
 
 # TODO:
 ## Flip names for plotting
-
+## Consolidate included / excluded chromosomes across modules for maximum compatibility. Include handling of non-standard chromosomes.
+o
 SCRIPT_DIR=$(dirname $0)
 
 usage () {
@@ -26,37 +27,38 @@ usage () {
 	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| USAGE: ./Run_LCS_pipeline.sh -i DATA directory with hic pipeline output. It serves as output      |"
 	  echo "|                      path for Calder, Dump, Saddle and Insulation scores.                         |"
+	  echo "|                      -i INPUT_DIR                                                                 |"
 	  echo "|                      -c COMPARISON_TABLE [tsv, csv, xlsx] desired comparisons.                    |"
 	  echo "|                      -o OUTPUT directory for plots                                                |"
 	  echo "|                      -g GENOME -b BIN_SIZE -p THREADS                        # CALDER flags       |"
-	  echo "|                      -r HIC_RES -b BIN_SIZE                                  # Calder Saddle flags|"
-	  echo "|                      -w INS_W_SIZE -n INS_NORMALISATION                      # Insulation flags   |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| See verbose descritpion below:                                                                    |"
-	  echo "| -i Path to the directory with hic pipeline results.                                               |"
-	  echo "|    IMPORTANT: this path serves as output path for Calder, Dump, Saddle and Insulation scores.     |"
-	  echo "| -c TSV table with desired comparison. Sample names HAVE TO match hic pipeline output results!!!!  |"
           echo "|---------------------------- CALDER MODULE --------------------------------------------------------|"
-          echo "| 1) Run Calder Module:                                                                             |"
-	  echo "|    -b BIN_SIZE - Resolution for Calder. Default 50000. Minimum is 10000.  			    |"
-	  echo "|    Chromosomes will be set according to the selected genome and file provided in the              |"
-	  echo "|    ${SCRIPT_DIR}/ref directory.                                                                   |"
-	  echo "|    (Used also for insulation analysis and calder saddle script.)                                  |"
-	  echo "|    -g Genome [hg19 or hg38]. Default hg19. See ./ref for files.                                   |"
-	  echo "|    -p Thread control. Default 1.								    |"
-          echo "|    - Adaptive is set to true.                                                                     |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 1) Calder parameters: 									    |"
+	  echo "|    -b HARDCODED: 50000.  BIN_SIZE - Resolution at which to run Calder.                            |"
+	  echo "|    -g GENOME  [hg19 or hg38]									    |"
+	  echo "|    -c HARDCODED: List of chromosomes to include. All autosomes + X.				    |"
+	  echo "|    -p NPROC - Number of threads to use. Default 4.						    |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "|--------------------------- DUMP MODULE -----------------------------------------------------------|"
-	  echo "| 2) Run Dump Module: 	                                                    			    |"
-	  echo "|   -D Resolution at which to dump interchromosomal contacts. Defualt is 1 000 000 000.             |"
-	  echo "|   -g GENOME                                                                                       |"
+	  echo "|---------------------------------------------------------------------------------------------------|"	  
+	  echo "| 2) Run Dump Module parameters:								    |"
+	  echo "|    Dump interchromosomal contacts at HARDCODED 1 000 000 000 resolution.			    |"
+	  echo "|    - GENOME [hg19 or hg38]									    |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "|---------------------------- SADDLE MODULE --------------------------------------------------------|"
-	  echo "| 3) Run Calder_Saddle. This module requires output from Calder.				    |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
+	  echo "| 3) Run compartment segregation computation. This is the largest module.			    |"
+	  echo "|    Requires Calder output (subcompartments bed file) and the .mcool file.		            |"
 	  echo "|    Compute compartment segregation scores. Outputs cscores tsv file.                              |"
-	  echo "|    -b BIN_SIZE - Calder resoultion                                                                |"
-	  echo "|    -r Hic resoultion to use. Default 1 000 000.                                                   |" 
+	  echo "|    -b HARDCODED: 50000.  BIN_SIZE - Resolution of Calder.			                    |"
+	  echo "|    -r Hic resoultion to use for superpixelling: HARDCODED 1 000 000.			            |"
 	  echo "|    - Number of tiles for compartment segregation is set to 16.                                    |"
 	  echo "|      Modify N_TILE parameter to change.                                                           |"
+	  echo "|    - Excluded chromosomes are read from ref/chroms_to_exclude.txt file.                           |"
+	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "|----------------------------- INSULATION MODULE ---------------------------------------------------|"
+	  echo "|---------------------------------------------------------------------------------------------------|"
 	  echo "| 4) Run Insulation Module:                                                                         |"
 	  echo "|    -w Window size for insulation scores. Default 1000000.                                         |"
 	  echo "|    -n Normalisation for insulation scores [VC_SQRT or KR].                                        |"
@@ -64,22 +66,20 @@ usage () {
 	  echo "|    Fixed params for insulation analysis (Hardcoded in the script):                                |"
 	  echo "|    - Output format is bigwig.  DELTA set to 4,  TRIM_MEAN = 0                                     |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
-	  echo "| One can skip above steps if needed (comment out core functions) and run LCS analysis directly.    |"
 	  echo "| Sample dir structure required for LCS analysis:                                                   |"
-	  echo "|                                                                                                   |"
-	  echo "|            ./{hic_sample}/1_subcomp_50000 						    |"
+	  echo "|            ./{hic_sample}/1_subcomp_50000 						            |"
 	  echo "|                           2_trans                                                                 |"
-	  echo "|                           3_CalderSaddleOutput_r1000000 				     	    |"
+	  echo "|                           3_saddle 				     	                            |"
 	  echo "|                           4_insulation 						    	    |"	
 	  echo "|                           aligned (hic_pipeline output) 					    |"
 	  echo "|                                        						            |"
 	  echo "|------------------------------ LCS MAIN ANALYSIS --------------------------------------------------|"
-	  echo "| 5) Run LCS analysis: -i Input data as above.                                                      |"
+	  echo "| 5) Run LCS analysis: -i Input data                                                                |"
 	  echo "|                      -o Output directory for plots.                                               |"
 	  echo "|                      -c Comparison table.                                                         |"
 	  echo "|                      -g Genome [hg19 or hg38].                                                    |"
 	  echo "|                      -r Hic resolution.                                                           |"
-	  echo "|                      -w Window size for insulation scores.                                        |"
+	  echo "|                      -w Window size of insulation scores.                                         |"
 	  echo "|                      --intra_chr_res Intra chromosomal resolution. [-d]                           |"
 	  echo "|---------------------------------------------------------------------------------------------------|"
 }
@@ -127,11 +127,11 @@ while getopts ":c:g:i:o:p:h" opt; do
     esac
 done
 
-# Hardcoded parameters for the input-generating modules and LCS analysis.
+# HARDCODED DEFAULTS
 CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes |\
 	     grep -v chrY |\
 	     sort | uniq |\
-	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to  in malformed hic files.
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to in malformed hic files.
 
 CHROMS=${CHROMS%,}
 echo "Using chromosomes: $CHROMS"
@@ -139,7 +139,6 @@ echo "Using chromosomes: $CHROMS"
 EXCLUDED_CHROMOSOMES=$(cat $SCRIPT_DIR/ref/chroms_to_exclude.txt )                                                      
 EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^chr//' )
 EXCLUDED_CHROMOSOMES=${EXCLUDED_CHROMOSOMES%,}
-echo "Excluding chromosomes: $EXCLUDED_CHROMOSOMES"
 
 CALDER_RES=50000
 HIC_RES=1000000
@@ -150,13 +149,12 @@ INTER_CHR_RES=1000000000
 # Segregation analysis 
 N_TILES=16
 
-## INSULATION
+## INSULATION - same as original WGD paper
 INS_OUTPUT_FORMAT="bigwig"
 INS_NORMALISATION='KR'
 INS_TRIM_MEAN=0
 BOUNDARY_DELTA_WINDOW=4
 INS_W_SIZE=1000000
-
 INTRA_CHR_RES=1000000
 
 ask_user () {
@@ -222,20 +220,15 @@ run_module_calder() {
 	   --genome $GENOME \
 	   --outpath $4 \
 	   --adaptive
-    # Make bed bak and call subcomps.bak
-    cp "$4/sub_compartments/all_sub_compartments.bed" "$4/sub_compartments/all_sub_compartments.bed.bak"
-    # Adjust 1-indexed fields: columns 2 and 7 (convert to 0-based for BED format); See comments section.
-    awk '{print $1"\t"($2-1)"\t"$3"\t"$4"\t"$5"\t"$6"\t"($7-1)"\t"$8"\t"$9}' \
-	"$4/sub_compartments/all_sub_compartments.bed.bak" > "$4/sub_compartments/tmp.bed"
-    sort -k1,1 -k2,2n "$4/sub_compartments/tmp.bed" > "$4/sub_compartments/all_sub_compartments.bed"
-    rm "$4/sub_compartments/tmp.bed"
-    # check if the bed file is valid (has 9 columns)
-    # awk 'NF!=9 {print "Error: Invalid bed file. Expected 9 columns, found "NF" columns in line: "$0; exit 1}' \
-    # 	"$4/sub_compartments/all_sub_compartments.bed"
-    # if [ $? -ne 0 ]; then
-    # 	echo "Error: Invalid bed file. Please check Calder output."
-    # 	exit 1
-    # fi
+    if [ ! -f "$4/sub_compartments/all_sub_compartments.bed" ]; then
+     	echo "Error: Calder subcompartments bed file not found!"
+	cp "$4/sub_compartments/all_sub_compartments.bed" "$4/sub_compartments/all_sub_compartments.bed.bak"
+	# Adjust 1-indexed fields: columns 2 and 7 (convert to 0-based for BED format); See comments section.
+	awk '{print $1"\t"($2-1)"\t"$3"\t"$4"\t"$5"\t"$6"\t"($7-1)"\t"$8"\t"$9}' \
+	    "$4/sub_compartments/all_sub_compartments.bed.bak" > "$4/sub_compartments/tmp.bed"
+	sort -k1,1 -k2,2n "$4/sub_compartments/tmp.bed" > "$4/sub_compartments/all_sub_compartments.bed"
+	rm "$4/sub_compartments/tmp.bed"
+    fi
 }
 
 run_module_dump() {
@@ -348,7 +341,7 @@ if [ ${#RUN_SADDLE[@]} -gt 0 ]; then
 	    COOL_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.mcool") ) # Get cool file
 	    CALDER_OUT=${INPUT_DIR}/${sample}/1_subcomp_${CALDER_RES}
 	    COMP_PATH=${CALDER_OUT}/sub_compartments/all_sub_compartments.bed
-	    SADDLE_OUT=${INPUT_DIR}/${sample}/3_CalderSaddleOutput_r${HIC_RES}
+	    SADDLE_OUT=${INPUT_DIR}/${sample}/3_saddle
 	    if [ ! -d $SADDLE_OUT ]; then mkdir -p $SADDLE_OUT; fi
 	    run_module_saddle ${COOL_PATH} ${COMP_PATH} ${SADDLE_OUT}
 	done
@@ -384,8 +377,8 @@ echo "--------------------------------------------------------------------------
 echo " ------------------ Run Genome-wide LCS analysis -------------------------------------------------"
 echo "---------------------------------------------------------------------------------------------------"
 
-# Run LCS_main.py main analysis
-python ${SCRIPT_DIR}/src/LCS_main_fix.py \
+# Main analysis starts here
+python ${SCRIPT_DIR}/src/lcs_main_dev.py \
         --INPUT_DIR ${INPUT_DIR} \
         --comparison ${COMPARISON_TABLE} \
         --intra_chr_res ${INTRA_CHR_RES} \
