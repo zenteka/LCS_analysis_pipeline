@@ -30,7 +30,7 @@ from pybedtools.bedtool import BedTool
 
 # Get saddle modules
 import saddle_plt
-import utils
+import saddle_utils 
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -102,7 +102,7 @@ def main():
     hic = fanc.load(hic_path + f"::resolutions/{hic_resolution}")
 
     compartments_bed = BedTool.from_dataframe(
-        utils.load_compartments(compartments_path, CALDER_HEADER)
+        saddle_utils.load_compartments(compartments_path, CALDER_HEADER)
     ).sort()
     
     bins = BedTool().window_maker(b = compartments_bed, w = compartments_resolution)
@@ -116,7 +116,7 @@ def main():
         print(chrom)
         logger.info(f"Analysing {chrom}")
         logger.info("- Extracting O/E values")
-        c_pixels = pl.DataFrame(utils.get_oe_values(hic, chrom))
+        c_pixels = pl.DataFrame(saddle_utils.get_oe_values(hic, chrom))
         
         # Get the binned compartments for the chromosome
         # - Extract the Hi-C bin (in the resolution of the Hi-C data) from the start of the compartment bin
