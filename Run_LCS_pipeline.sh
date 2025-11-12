@@ -1,15 +1,15 @@
 #!/bin/bash
-# Wrapper around Luca's LCS pipeline that is part of the WGD project.
+# LCS PIPELINE - Loss of Chromatin Segregation analysis from the WGD paper.
 # AUTHOR: Karol Piera and Luca Nanni
 # Email: karol.piera@unil.ch
 
-# LCS is meant to be run on hic pipeline output. Desired comparison should be provided in a tsv, csv or xlsx format.
-# LCS pipeline is a module-based analysis. Ouptut of module 1 to 4 is required to run the main LCS analysis.
+# LCS is to be run on hic pipeline output. Desired comparison should be provided in a tsv, csv or xlsx format.
+# It is a module-based analysis. Ouptut of module 1 to 4 is required to run the main LCS analysis.
 
 # TODO:
 ## Flip names for plotting
 ## Consolidate included / excluded chromosomes across modules for maximum compatibility. Include handling of non-standard chromosomes.
-o
+
 SCRIPT_DIR=$(dirname $0)
 
 usage () {
@@ -131,7 +131,7 @@ done
 CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes |\
 	     grep -v chrY |\
 	     sort | uniq |\
-	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to in malformed hic files.
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to avoid issues with non-standard chromosomes.
 
 CHROMS=${CHROMS%,}
 echo "Using chromosomes: $CHROMS"
