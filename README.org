@@ -31,11 +31,13 @@ This pipeline is an extension of hic_pipeline, therefore it follows an input dir
 
 For the analysis to run, the user needs to provide the following input:
 - output directory of hic_pipeline, provided to the script as -i flag. See: data input.
+- script expects hic and mcool files. Different file formats are used by different analysis scripts.  
 - tsv table with desired comparisons. See: Sample comparisons input.
   
 ** input (for every sample)
 #+begin_src bash
-  <input_path>/{hic_sample}/aligned
+  <input_path>/{hic_sample}/aligned/inter_30.hic
+                                    inter_30.mcool
 #+end_src
 
 ** Sample run  
