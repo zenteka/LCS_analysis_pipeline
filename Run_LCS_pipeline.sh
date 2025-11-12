@@ -399,29 +399,6 @@ python ${SCRIPT_DIR}/src/LCS_subcomp_chrom.py \
 		--comparisons ${COMPARISON_TABLE} \
 		--output ${CHROM_LCS}
 
-# Save comparison with results and archive
-cp ${COMPARISON_TABLE} ${OUT_PATH}/
-cp ${COMPARISON_TABLE} /mnt/data2/karol/DevAll_shared/With_Konstantina/comparisons/done/
-
-# If on UNIX try to levrage ghostscript to merge reports
-if gs --version > /dev/null 2>&1; then
-    echo "Merging reports"
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    for res_dir in $OUT_PATH/*; do
-	if [[  "$res_dir" == "Interchromosomal_OE" ]]; then
-	    # Skip
-	    echo "Skipping $res_dir"
-	else
-	    echo "Merging reports for $res_dir"
-	    gs -o ${res_dir}/$(basename ${res_dir})_MergedReport.pdf \
-	       -dNOPAUSE -sDEVICE=pdfwrite -dAutoRotatePages=/None -sPAPERSIZE=a4 \
-	       -dPDFSETTINGS=/prepress \
-	       -c "<</Orientation 3>> setpagedevice" \
-	       -f ${res_dir}/*pdf
-	fi
-    done
-    fi
-else
-    echo "Warning: ghostscript not found. Cannot merge plots into one report!"		
-fi
-
+echo "---------------------------------------------------------------------------------------------------"
+echo " ------------------ LCS PIPELINE COMPLETED -------------------------------------------------------"
+echo "---------------------------------------------------------------------------------------------------"
