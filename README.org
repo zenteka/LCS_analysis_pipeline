@@ -32,6 +32,11 @@ This pipeline is an extension of hic_pipeline, therefore it follows an input dir
 For the analysis to run, the user needs to provide the following input:
 - output directory of hic_pipeline, provided to the script as -i flag. See: data input.
 - tsv table with desired comparisons. See: Sample comparisons input.
+  
+** input (for every sample)
+#+begin_src bash
+  <input_path>/{hic_sample}/aligned
+#+end_src
 
 ** Sample run  
 #+begin_src bash
@@ -62,7 +67,7 @@ This is where the LCS_main looks for the necessary file to run the analysis.
 After completion of modules 1-4, each sample's directory should contain:
 
 #+begin_src bash
-   ./{hic_sample}/1_subcomp_50000                        
+   <input_path>/{hic_sample}/1_subcomp_50000                        
 		  2_trans                                     
 		  3_saddle
 		  4_insulation
