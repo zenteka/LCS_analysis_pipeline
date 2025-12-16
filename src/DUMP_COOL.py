@@ -38,7 +38,7 @@ def process_arguments():
 	parser.add_argument("cool_path", type=str, help='Path to the cool file')
 	parser.add_argument('output_path', type=str, help='Output path where to store the dumped result')
 	parser.add_argument('--resolution', type=int, const=10000000, nargs='?', help='Minimum distance between bins to include in the calculation')
-	#parser.add_argument("--excludeChroms", type=str, default=None, help="Chromosomes to exclude")
+	#parser.add_argument("--chr", type=str, default=None, help="Chromosomes to exclude")
 	parser.add_argument('--genome', type=str, help='Reference genome')
 	args = parser.parse_args()
 	return args
@@ -84,7 +84,7 @@ def main():
 	logger.info(f"Output path: {output_path}")
 	#logger.info(f"Chromosomes to exclude: {excludeChroms}")
 	logger.info(f"Genome: {genome}")
-
+        
 	if genome in ['hg19', 'hg38']:
 	 	CHROMS = HUMAN_CHROMS
 	elif genome in ['mm9', 'mm10']:
