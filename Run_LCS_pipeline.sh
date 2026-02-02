@@ -1,9 +1,11 @@
 #!/bin/bash
-# LCS PIPELINE - Loss of Chromatin Segregation analysis from the WGD paper.
+
+# LCS pipeline - Loss of Chromatin Segregation analysis from the WGD paper.
+
 # AUTHOR: Karol Piera and Luca Nanni
 # Email: karol.piera@unil.ch
 
-# LCS is to be run on hic pipeline output. Desired comparison should be provided in a tsv, csv or xlsx format.
+# LCS should be run on hic pipeline output. Desired comparison should be provided in a tsv, csv or xlsx format.
 # It is a module-based analysis. Ouptut of module 1 to 4 is required to run the main LCS analysis.
 
 # TODO:
@@ -87,28 +89,8 @@ usage () {
 while getopts ":c:g:i:o:p:h" opt; do
     case ${opt} in 
 	c ) COMPARISON_TABLE=$OPTARG;;                              # Comparison table
-	g )
-	    # Genome
-	    if [ $OPTARG == "hg19" ]; then
-		GEN_PATH=$SCRIPT_DIR/ref/hg19.main.chrom.sizes
-		GENOME="hg19"
-	    elif [ $OPTARG == "hg38" ]; then
-		GEN_PATH=$SCRIPT_DIR/ref/hg38.main.chrom.sizes
-		GENOME="hg38"
-	    elif [ $OPTARG == "mm10" ]; then
-		GEN_PATH=$SCRIPT_DIR/ref/mm10.main.chrom.sizes
-		GENOME="mm10"
-	    else
-		echo "Invalid genome. Supported genomes are hg19 and hg38"
-		exit 1
-	    fi
-	    ;;
-	i ) INPUT_DIR=$OPTARG
-	    if [ ! -d $INPUT_DIR ]; then
-		echo "Input directory does not exist"
-		exit 1
-	    fi
-	    ;;
+	g ) GENOME=$OPTARG;;
+	i ) INPUT_DIR=$OPTARG;;
 	p ) NPROC=$OPTARG;;
 	o ) OUT_PATH=$OPTARG
 	    if [ ! -d $OUT_PATH ]; then
@@ -127,23 +109,28 @@ while getopts ":c:g:i:o:p:h" opt; do
     esac
 done
 
-# HARDCODED DEFAULTS
-CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes |\
-	     grep -v chrY |\
-	     sort | uniq |\
-	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to avoid issues with non-standard chromosomes.
+if [ ! -d $INPUT_DIR ]; then
+	echo "Input directory does not exist"
+	exit 1
+fi
+# Parse genome
+if [ $GENOME == "hg19" ]; then
+    GEN_PATH=$SCRIPT_DIR/ref/hg19.main.chrom.sizes
+elif [ $GENOME == "hg38" ]; then
+    GEN_PATH=$SCRIPT_DIR/ref/hg38.main.chrom.sizes
+elif [ $GENOME == "mm10" ]; then
+    GEN_PATH=$SCRIPT_DIR/ref/mm10.main.chrom.sizes
+else
+    echo "Invalid genome. Supported genomes are hg19 and hg38"
+    exit 1
+fi
 
-CHROMS=${CHROMS%,}
-echo "Using chromosomes: $CHROMS"
 
-EXCLUDED_CHROMOSOMES=$(cat $SCRIPT_DIR/ref/chroms_to_exclude.txt )                                                      
-EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^chr//' )
-EXCLUDED_CHROMOSOMES=${EXCLUDED_CHROMOSOMES%,}
-
+# CALDER parameters
 CALDER_RES=50000
 HIC_RES=1000000
 
-# TRANS CONTACTS ANALYSIS
+# TRANS CONTACT ANALYSIS
 INTER_CHR_RES=1000000000
 
 # Segregation analysis 
@@ -157,6 +144,35 @@ BOUNDARY_DELTA_WINDOW=4
 INS_W_SIZE=1000000
 INTRA_CHR_RES=1000000
 
+# Default number of threads
+# Deal wit hchroms based on genome
+
+if [ "hg38" == "$GENOME" ]; then
+	CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg38.main.chrom.sizes |\
+	     grep -v chrY |\
+	     sort | uniq |\
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to avoid issues with non-standard chromosomes.
+elif [ "mm10" == "$GENOME" ]; then
+	CHROMS=$(cut -f1 $SCRIPT_DIR/ref/mm10.main.chrom.sizes |\
+	     grep -v chrY |\
+	     sort | uniq |\
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to avoid issues with non-standard chromosomes.
+elif [ "hg19" == "$GENOME" ]; then
+    CHROMS=$(cut -f1 $SCRIPT_DIR/ref/hg19.main.chrom.sizes |\
+	     grep -v chrY |\
+	     sort | uniq |\
+	     tr '\n' , | sed 's/chr//g' ) # Chromosomes to include - used for Calder, pass explicitly to avoid issues with non-standard chromosomes.
+fi
+
+CHROMS=${CHROMS%,}
+echo "Using chromosomes: $CHROMS"
+
+# Sanity check for excluded chromosomes file
+EXCLUDED_CHROMOSOMES=$(cat $SCRIPT_DIR/ref/chroms_to_exclude.txt )                                                      
+EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^chr//' )
+EXCLUDED_CHROMOSOMES=${EXCLUDED_CHROMOSOMES%,}
+
+
 ask_user () {
         echo "$1 output found."
 	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
@@ -169,48 +185,6 @@ ask_user () {
 	fi
 }
 
-# Screen samples for required input. Collect for further processing.
-SAMPLES=()
-RUN_CALDER=()
-RUN_DUMP=()
-RUN_SADDLE=()
-RUN_INSULATION=()
-  
-while IFS= read -r line; do
-    # check if sample exists in input dir
-    if [ ! -f "$INPUT_DIR/$line/aligned/inter_30.hic" ]; then
-	echo "Error: Sample $line does not appear to have hic file!"
-	echo "Please check your input directory and comparison table!"
-	exit 1
-    else
-	SAMPLES+=("$line")
-    fi
-done < <(cut -f1-2 $COMPARISON_TABLE | tr '\n' '\n' | tr '\t' '\n' | sort | uniq)
-
-# Step 2: Check for missing required inputs
-for sample in "${SAMPLES[@]}"; do
-    echo "Checking sample $sample for missing inputs..."
-
-    # Check if Calder output is missing
-    if ! find -L "$INPUT_DIR" -type d -path "*/$sample/1_subcomp_${CALDER_RES}/sub_compartments" | grep -q .; then
-        RUN_CALDER+=("$sample")
-    fi
-
-    # Check if binsize dump is missing
-    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/*binsize_${INTER_CHR_RES}.tsv" | grep -q .; then
-        RUN_DUMP+=("$sample")
-    fi
-
-    # Check if Saddle output is missing
-    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/3_saddle/compartment_scores.tsv" | grep -q .; then
-        RUN_SADDLE+=("$sample")
-    fi
-
-    # Check if Insulation output is missing
-    if ! find -L "$INPUT_DIR" -type d -path "*/$sample/4_insulation" | grep -q .; then
-        RUN_INSULATION+=("$sample")
-    fi
-done
 
 run_module_calder() {
     calder --input $1 \
@@ -223,7 +197,7 @@ run_module_calder() {
     if [ ! -f "$4/sub_compartments/all_sub_compartments.bed" ]; then
      	echo "Error: Calder subcompartments bed file not found!"
 	cp "$4/sub_compartments/all_sub_compartments.bed" "$4/sub_compartments/all_sub_compartments.bed.bak"
-	# Adjust 1-indexed fields: columns 2 and 7 (convert to 0-based for BED format); See comments section.
+
 	awk '{print $1"\t"($2-1)"\t"$3"\t"$4"\t"$5"\t"$6"\t"($7-1)"\t"$8"\t"$9}' \
 	    "$4/sub_compartments/all_sub_compartments.bed.bak" > "$4/sub_compartments/tmp.bed"
 	sort -k1,1 -k2,2n "$4/sub_compartments/tmp.bed" > "$4/sub_compartments/all_sub_compartments.bed"
@@ -292,14 +266,60 @@ display_msg_present () {
 }
 
 echo "---------------------------------------------------------------------------------------------------"
-echo " ------------------ Running modules 1-4: Calder, Dump, Saddle, Insulation ---------------------------"
+echo " ------------------ SETP 2: CHECK FOR MISSING INPUTS -----------------------------------------------"
+echo "---------------------------------------------------------------------------------------------------"
+
+SAMPLES=()
+RUN_CALDER=()
+RUN_DUMP=()
+RUN_SADDLE=()
+RUN_INSULATION=()
+
+# Check samples first 
+while IFS= read -r line; do
+    # check if sample exists in input dir
+    if [ ! -f "$INPUT_DIR/$line/aligned/inter_30.hic" ]; then
+	echo "Error: Sample $line does not appear to have hic file!"
+	echo "Please check your input directory and comparison table!"
+	exit 1
+    else
+	SAMPLES+=("$line")
+    fi
+done < <(cut -f1-2 $COMPARISON_TABLE | tr '\n' '\n' | tr '\t' '\n' | sort | uniq)
+
+# For every sample check whether required input files are present
+for sample in "${SAMPLES[@]}"; do
+    echo "Checking sample $sample for missing inputs..."
+
+    # Check if Calder output is missing
+    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/1_subcomp_${CALDER_RES}/sub_compartments/all_sub_compartments.bed" | grep -q .; then
+        RUN_CALDER+=("$sample")
+    fi
+
+    # Check if binsize dump is missing
+    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/*binsize_${INTER_CHR_RES}.tsv" | grep -q .; then
+        RUN_DUMP+=("$sample")
+    fi
+
+    # Check if Saddle output is missing
+    if ! find -L "$INPUT_DIR" -type f -path "*/$sample/3_saddle/compartment_scores.tsv" | grep -q .; then
+        RUN_SADDLE+=("$sample")
+    fi
+
+    # Check if Insulation output is missing
+    # TODO: check for filine name to search. Directory presence might be misleading.
+    if ! find -L "$INPUT_DIR" -type d -path "*/$sample/4_insulation" | grep -q .; then
+        RUN_INSULATION+=("$sample")
+    fi
+done
+
+echo "---------------------------------------------------------------------------------------------------"
+echo " ------------------ SETP 3: RUN MODULES FOR MISSING INPUTS ----------------------------------------"
 echo "---------------------------------------------------------------------------------------------------"
 
 # check every RUN_ array and in case it is not empty ask user whether to run modules for given samples.
 if [ ${#RUN_CALDER[@]} -gt 0 ]; then
     echo "Detected missing subcompartment calls for samples: ${RUN_CALDER[@]}"
-    ask_user "Calder"
-    if [ $? -eq 0 ]; then
 	for sample in "${RUN_CALDER[@]}"; do
 	    display_msg_run "Calder" $sample $CALDER_RES
 	    HIC_PATH=$( realpath $(find -L $INPUT_DIR/$sample -name "*30.hic") ) # Get hic file
@@ -307,9 +327,6 @@ if [ ${#RUN_CALDER[@]} -gt 0 ]; then
 	    if [ ! -d $CALDER_OUT ]; then mkdir -p $CALDER_OUT; fi
 	    run_module_calder ${HIC_PATH} ${CALDER_RES} ${NPROC} ${CALDER_OUT}
 	done
-    else
-	display_msg_skip "Calder"
-    fi
 else
     display_msg_present "Calder"
 fi
