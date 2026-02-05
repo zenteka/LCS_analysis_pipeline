@@ -26,11 +26,18 @@ The pipeline is currently comprised of 4 modules that are required for the compl
 
 *Modules:*
 - module 1: Calder - compartment calls
+  required file: all_sub_compartments.bed
 - module 2: Trans inter-chromosomal contacts at the whole-chromosomes scale
+  required file: binsize_1000000000.tsv
 - module 3: Output os SADDLE script that in itself is an analysis. REQUIRES compartment calls.
-- module 4: insulation score output - boundaries 
+  required file: compartment_scores.tsv
+- module 4: insulation score output - boundaries
+  required files:
+  + insulation_scores_r50000_KR_w1000000_boundaries.bed
+  + insulation_scores_r50000_KR_w1000000.bedGraph
 
 This pipeline is an extension of hic_pipeline, therefore it builds on top of input directory structure of the hic_pipeline. For more details please refer to the CSO [[https://github.com/CSOgroup/hic_pipeline][hic_pipeline here]].
+
 
 * Input
 
@@ -56,15 +63,16 @@ In addition, KR normalization in the .hic file is required. If the normalization
 #+begin_src bash
   ./Run_LCS_pipeline.sh -i <input_path> \  # hic_pipeline output; 1-4 moduels results will be saved in sample folders
 		      -o <output_path> \        # where plots will be saved
-		      -c <tsv file> \           # Comaprison tables
+		      -c <comparisons{.tsv.csv.xslx}> \           # Comaprison tables
 		      -p 40 \                   # Cores 
-		      -g hg19                   # Genome: hg19 and hg38 supported currently
+		      -g {hg38,hg19,mm10}       # Genomes 
 #+end_src
 
 ** Comparison table -c [comparison table flag]
 
 Table with desired comparisons. Please MAKE SURE that selected comparison correspond to directory/folder names in the hic_pipeline output. It is CRUCIAL for the pipline to work correctly.
-Simply, just open any table editor and make 2-column table like this, using folder names from hic_output.
+
+Open any editor and make 2-column table like this, using folder names from hic output.
 
 
 | sample1 (control)   | sample2                |
