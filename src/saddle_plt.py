@@ -53,7 +53,8 @@ def plt_comp_segreg_distribution(indf, chrom, output_path=None):
     sns.scatterplot(data = indf, 
                     x="domain_rank", y="oe_sim_corr",
                     hue="compartment", hue_order=list(reversed(COMPARTMENTS_8_LABELS)),
-                    palette="bwr", legend=False,
+                    palette="bwr",
+                    legend=False,
                     rasterized=False)
     plt.xlabel("Compartment rank")
     plt.ylabel("Segregation score")
@@ -74,9 +75,10 @@ def plt_tile_segreg_distribution(indf, chrom, output_path=None):
     - output_path: Path to save the plots.
     """
     fig = plt.figure()
-    sns.boxplot(data=indf, x = 'tile', 
-                y='oe_sim_corr', hue = "tile",
-                legend = False,
+    sns.boxplot(data=indf,
+                x = 'tile', 
+                y='oe_sim_corr',
+                hue = "tile",
                 palette = 'bwr')
     plt.xlabel("Compartment percentile")
     plt.ylabel("Segregation score")
@@ -119,8 +121,11 @@ def plt_tile_analysis(tiledf, chrom_comps, chrom, output_path=None):
         plt.show()
     
     fig = plt.figure()
-    sns.boxplot(data = chrom_comps, x='tile', y='domain_rank',
-                hue='tile', legend=False, palette='bwr')
+    sns.boxplot(data = chrom_comps,
+                x='tile',
+                y='domain_rank',
+                hue='tile', 
+                palette='bwr')
     plt.xlabel("Compartment percentile")
     plt.ylabel("Compartment rank")
     sns.despine()
@@ -162,8 +167,7 @@ def plt_comp_rank_distribution(chrom_comps, chrom, output_path=None):
                 hue='compartment',
                 order=list(reversed(COMPARTMENTS_8_LABELS)),
                 hue_order=list(reversed(COMPARTMENTS_8_LABELS)),
-                palette='bwr',
-                legend=False)
+                palette='bwr')
     plt.xlabel("Compartment")
     plt.ylabel("Compartment rank")
     sns.despine()
@@ -266,14 +270,12 @@ def plt_AB_segregation(all_comp_level,output_path=None):
                     x = 'compartment_pair_diff_same', y = "avg_oe",
                     order = list(comp_2leve_palette.keys()),
                     hue = 'compartment_pair_diff_same',
-                    legend = False,
                     palette = comp_2leve_palette,
                     showfliers=False,
                     boxprops={'alpha':0.3})
     ax = sns.stripplot(data = all_comp_2level, 
                        x = 'compartment_pair_diff_same', y = "avg_oe",
                        hue = 'compartment_pair_diff_same',
-                       legend = False,
                        order = list(comp_2leve_palette.keys()),
                        palette = comp_2leve_palette)
     annotator = Annotator(ax, 

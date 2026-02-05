@@ -22,7 +22,7 @@ import argparse
 import fanc
 import numpy as np
 import pandas as pd
-import polars as pl 
+import polars as pl
 
 from scipy.stats import spearmanr
 from sklearn.preprocessing import StandardScaler
@@ -35,7 +35,9 @@ import saddle_utils
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-CALDER_HEADER=['chr', 'start', 'end', 'compartment_label', 'domain_rank_8_levels', 'strand', 'tickStart', 'tickEnd', 'color']
+CALDER_HEADER=['chr', 'start', 'end',
+               'compartment_label', 'domain_rank_8_levels',
+               'strand', 'tickStart', 'tickEnd', 'color']
 COMPARTMENTS_8_LABELS = ["{}.{}.{}".format(l1, l2, l3) for l1 in ['A', 'B'] for l2 in [1, 2] for l3 in [1, 2]]
 
 def set_logger():
@@ -326,7 +328,7 @@ def main():
         RANK_PLT_PATH = os.path.join(PLT_PATH, "5_chrom_comp_rank_distribution")
         os.makedirs(RANK_PLT_PATH, exist_ok=True)
         saddle_plt.plt_comp_rank_distribution(chrom_comps.to_pandas(), chrom, output_path=RANK_PLT_PATH)
-
+        
         #################### Compartment domain rank level analysis #######################
         logger.info("- Domain-level analysis")
         domain_level = chrom_pixels_with_comp.group_by(['compartment_id1', 'compartment_id2',
