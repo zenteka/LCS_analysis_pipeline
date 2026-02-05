@@ -32,7 +32,6 @@ from lcs_plt import (
     plot_intra_chromosomal_OE_contacts,
 )
 
-# Reqiete parsing into a function to be able to call it from other scripts
 def process_arguments():
     parser = argparse.ArgumentParser(description='Run LCS analysis')
     parser.add_argument("-c", "--comparison", type=str, help='Path to the tsv file containing the desired comparisons')
@@ -249,8 +248,15 @@ def main(args):
     os.makedirs(INTER_CHROMOSOMAL_OE_OUTPUT, exist_ok=True)
     CHROMSIZES = pd.read_csv(args.genome, sep="\t", header=None, names = ['chr', 'length'])
     CHROMS_BY_SIZE = CHROMSIZES.sort_values('length', ascending=False).chr.tolist()
-    LONG_CHROMS = CHROMS_BY_SIZE[:15]
-    SHORT_CHROMS = CHROMS_BY_SIZE[15:]
+
+    # Determine chroms for human and mouse separately
+    GENOME = os.path.basename(args.genome).split('.')[0]
+    if 'hg' in GENOME:
+        LONG_CHROMS = CHROMS_BY_SIZE[:15]
+        SHORT_CHROMS = CHROMS_BY_SIZE[15:]
+    if 'mm' in GENOME:
+        LONG_CHROMS = CHROMS_BY_SIZE[:16]
+        SHORT_CHROMS = CHROMS_BY_SIZE[16:]
     
     COMPARTMENTS_8_LABELS = ["{}.{}.{}".format(l1, l2, l3) for l1 in ['A', 'B'] for l2 in [1, 2] for l3 in [1, 2]]
     INSULATION_CHANGE_TO_COLOR = {
@@ -269,15 +275,13 @@ def main(args):
     
     # Get comparison file from commonly used formats
     if args.comparison.endswith('.tsv'):
-        LCS_COMPARISONS = pd.read_csv(args.comparison, sep='\t',
-                                      names=['sample1', 'sample2'])
+        LCS_COMPARISONS = pd.read_csv(args.comparison, sep='\t', header=0)
         print(LCS_COMPARISONS)
     elif args.comparison.endswith('.csv'):
-        LCS_COMPARISONS = pd.read_csv(args.comparison,
-                                      names=['sample1', 'sample2'])
+        LCS_COMPARISONS = pd.read_csv(args.comparison, header=0)
+                                 
     elif args.comparison.endswith('.xlsx'):
-        LCS_COMPARISONS = pd.read_excel(args.comparison,
-                                        names = ['sample1', 'sample2'])
+        LCS_COMPARISONS = pd.read_excel(args.comparison, header=0)
     else:
         print("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
         raise ValueError("Input file format not recognized. Please provide a valid tsv, csv or xlsx file")
