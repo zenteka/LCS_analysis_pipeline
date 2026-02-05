@@ -14,18 +14,23 @@ Clone repository:
 Setup the environment:
 
 #+begin_src bash
-  conda/mamba/micromaba create -f lcs_pipeline.yml -n lcs
-  # Install the rest with pip.
+  conda/mamba/micromaba create -f lcs.yml -n lcs
+  # Install missing pip requirements separately. 
   pip install -r pip.requiremnts.txt
 #+end_src
 
 
 * About the pipeline
 
-The pipeline is currently comprised of 4 modules that are required for the complete LCS analysis which itself is the 5 module. It is based on LCS pipeline used in the original [[https://github.com/CSOgroup/WGD][WGD paper.]]  See below for details. 
+The pipeline is currently comprised of 4 modules that are required for the complete LCS analysis. It is a wrapper around LCS pipeline used in the original [[https://github.com/CSOgroup/WGD][WGD paper.]] The main LCS can successfully run only if all the data is in place (see. output directory structure).
 
-This pipeline is an extension of hic_pipeline, therefore it follows an input directory structure of the hic_pipeline. For more details please refer to the CSO [[https://github.com/CSOgroup/hic_pipeline][hic_pipeline here]].
+*Modules:*
+- module 1: Calder - compartment calls
+- module 2: Trans inter-chromosomal contacts at the whole-chromosomes scale
+- module 3: Output os SADDLE script that in itself is an analysis. REQUIRES compartment calls.
+- module 4: insulation score output - boundaries 
 
+This pipeline is an extension of hic_pipeline, therefore it builds on top of input directory structure of the hic_pipeline. For more details please refer to the CSO [[https://github.com/CSOgroup/hic_pipeline][hic_pipeline here]].
 
 * Input
 
@@ -41,8 +46,8 @@ For the analysis to run, the user needs to provide the following input:
 #+end_src
 
 The .mcool file should include the resolutions that are necessary for the analysis:
-- 10.000.000
-- 1.000.000
+
+- 1.000.000 (for inter-chromosomal counts )
 - 50.000
 
 In addition, KR normalization in the .hic file is required. If the normalization is not there (for example, you are starting from cool files) you can use `hictk` to add it (`ice`), using the `--name KR` parameter.
@@ -62,10 +67,13 @@ Table with desired comparisons. Please MAKE SURE that selected comparison corres
 Simply, just open any table editor and make 2-column table like this, using folder names from hic_output.
 
 
-| SAMPLE_1 (control)  | SAMPLE 2               |
+| sample1 (control)   | sample2                |
 | e.g. CPA_RB_AB_mega | e.g.CPA_RB_WGD_AB_mega |
  
-
+FILES SUPPORTED [IMPORTANT!]:
+- csv 
+- tsv (*do not export from excel!*)
+- xlsx (use xlsx directly)
 * Output structure
 
 ** Output
@@ -90,6 +98,7 @@ the output is corrected to be 0-indexed.
 
 **** Directory 2_trans
 Inter-chromosmal contacts (DUMP_COOL output) at 1Gbp (Whole chromosome).
+
 **** Directory 3_saddle
 Stores the output calder saddle script computed at a given hic resolution. Calder saddle script takes as an input calder subcompartment bed file. 
 
@@ -98,8 +107,16 @@ Stores the output of insulation analysis with fanc. Boundaries and scores.
 
 ** Plots 
 
-All the plots will be saved to the directory provided by the user in -o flag. Number of directories will correspond to the number of comparisons specified in the tsv file,
+All the plots will be saved to the directory provided by the user in -o flag.
 
+*** Interchromosomal_OE
+This directory produces pair-wise inter-chromosmal OE plots. Here you can check for any global changes casued by e.g. transloactions.
+
+*** sample_vs_sample2
+This directory contains all the comparisons the user requested. For each comparisons you should be able to see:
+- compartment lcs: heatmap and delta ranks plots
+- insulation scores / boundaries
+- interchromosomal pair-wise O/E
 
 * LCS_main
 
