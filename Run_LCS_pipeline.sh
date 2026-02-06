@@ -113,6 +113,7 @@ if [ ! -d $INPUT_DIR ]; then
 	echo "Input directory does not exist"
 	exit 1
 fi
+
 # Parse genome
 if [ $GENOME == "hg19" ]; then
     GEN_PATH=$SCRIPT_DIR/ref/hg19.main.chrom.sizes
@@ -191,12 +192,14 @@ for p in "${mcool_paths[@]}"; do
     fi
 done
 
-echo "Run 'chr' prefix check..."
-if [[ " ${PREFIX_ARRAY[*]} " == *" 0 "* ]] && [[ ! " ${PREFIX_ARRAY[*]} " == *" 1 "* ]]; then
-	EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^/chr/' )
-elif [[ " ${PREFIX_ARRAY[*]} " == *" 1 "* ]] && [[ ! " ${PREFIX_ARRAY[*]} " == *" 0 "* ]]; then
-    CHROMS=$(echo "$CHROMS" | sed 's/chr//g' )
-fi
+
+# TODO: fix prefix check
+#echo "Run 'chr' prefix check..."
+# if [[ " ${PREFIX_ARRAY[*]} " == *" 0 "* ]] && [[ ! " ${PREFIX_ARRAY[*]} " == *" 1 "* ]]; then
+# 	EXCLUDED_CHROMOSOMES=$(echo "$EXCLUDED_CHROMOSOMES" | sed 's/^/chr/' )
+# elif [[ " ${PREFIX_ARRAY[*]} " == *" 1 "* ]] && [[ ! " ${PREFIX_ARRAY[*]} " == *" 0 "* ]]; then
+#     CHROMS=$(echo "$CHROMS" | sed 's/chr//g' )
+# fi
 
 echo "Chromosome names are standardized across all files. Proceeding with the analysis..."
 echo "Using chromosomes: $CHROMS"
