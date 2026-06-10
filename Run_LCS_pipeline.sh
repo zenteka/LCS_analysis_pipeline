@@ -422,7 +422,7 @@ echo " ------------------ Run Genome-wide LCS analysis -------------------------
 echo "---------------------------------------------------------------------------------------------------"
 
 # Main analysis starts here
-python ${SCRIPT_DIR}/src/lcs_main_dev.py \
+python ${SCRIPT_DIR}/src/lcs_main.py \
         --INPUT_DIR ${INPUT_DIR} \
         --comparison ${COMPARISON_TABLE} \
         --intra_chr_res ${INTRA_CHR_RES} \
