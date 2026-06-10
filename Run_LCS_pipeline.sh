@@ -207,18 +207,6 @@ echo "Excluded chroms list: $EXCLUDED_CHROMOSOMES"
 
 # echo "Total mcool files found: ${#mcool_paths[@]}"
 # %% Define modules
-ask_user () {
-        echo "$1 output found."
-	echo "Do you want run $1 module? Type 'yes' or 'y' to proceed..."
-	read in_p
-	echo $in_p
-	if [ $in_p == 'yes' ] || [ $in_p == 'y' ] ; then
-	    return 0
-	else
-	    return 1
-	fi
-}
-
 run_module_calder() {
     calder --input "$1" \
            --bin_size "$2" \
@@ -359,7 +347,6 @@ echo "--------------------------------------------------------------------------
 echo " ------------------ SETP 3: RUN MODULES FOR MISSING INPUTS ----------------------------------------"
 echo "---------------------------------------------------------------------------------------------------"
 
-# check every RUN_ array and in case it is not empty ask user whether to run modules for given samples.
 if [ ${#RUN_CALDER[@]} -gt 0 ]; then
     echo "Detected missing subcompartment calls for samples: ${RUN_CALDER[@]}"
 	for sample in "${RUN_CALDER[@]}"; do
